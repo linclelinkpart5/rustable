@@ -1,4 +1,14 @@
 
+// Import and re-export external types for easier downstream usage.
+#[cfg(feature = "decimal")]
+pub use rust_decimal::Decimal;
+#[cfg(feature = "date-time")]
+pub use chrono::naive::{
+    NaiveDate as Date,
+    NaiveTime as Time,
+    NaiveDateTime as DateTime,
+};
+
 /// Helper macro to create the plumbing for each type supported in `rustable`.
 macro_rules! define_types {
     ( $( ($type:ty, $s_name:ident, $l_name:ident $( , $cfg_flag:meta )?), )+ ) => {
@@ -12,7 +22,7 @@ macro_rules! define_types {
         /// row for data.
         #[derive(PartialEq)]
         pub enum Datum<'a> {
-            $( $s_name(&'a $type) ),*
+            $( $(#[$cfg_flag])? $s_name(&'a $type) ),*
         }
 
         /// An enum representation of a `Series`, typically only seen when
@@ -46,10 +56,11 @@ define_types!(
     (char, CHAR, CHAR),
     (bool, BOOL, BOOL),
 
-    // (String, STRING, STRING),
+    (String, STRING, STRING),
 
-    // DECIMAL
-    // DATE
-    // TIME
-    // DATETIME
+    (Decimal, DECIMAL, DECIMAL, cfg(feature = "decimal")),
+
+    (Date, DATE, DATE, cfg(feature = "date-time")),
+    (Time, TIME, TIME, cfg(feature = "date-time")),
+    (DateTime, DATETIME, DATETIME, cfg(feature = "date-time")),
 );

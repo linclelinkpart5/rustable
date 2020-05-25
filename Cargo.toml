@@ -7,7 +7,16 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+chrono = { version = "0.4", optional = true }
+rust_decimal = { version = "1.6", optional = true }
 
 [features]
+
 # Include `i128`/`u128` as data types.
-128-bit = []
+128 = []
+
+# Include `Decimal` as a data type.
+decimal = ["rust_decimal"]
+
+# Include `Date`/`Time`/`DateTime` as data types.
+date-time = ["chrono"]
