@@ -44,14 +44,14 @@ macro_rules! define_types {
             $(
                 $(#[$cfg_flag])?
                 impl Storable for $type {
-                    fn dtype(&self) -> DType {
+                    fn dtype() -> DType {
                         DType::$name
                     }
                 }
 
                 $(#[$cfg_flag])?
                 impl Storable for Option<$type> {
-                    fn dtype(&self) -> DType {
+                    fn dtype() -> DType {
                         DType::[<Opt $name>]
                     }
                 }
