@@ -9,6 +9,8 @@ pub use chrono::naive::{
     NaiveDateTime as DateTime,
 };
 
+use crate::traits::Storable;
+
 /// Helper macro to create the plumbing for each type supported in `rustable`.
 macro_rules! define_types {
     ( $( ($type:ty, $name:ident $( , $cfg_flag:meta )?), )+ ) => {
@@ -38,6 +40,22 @@ macro_rules! define_types {
             pub enum Column {
 
             }
+
+            $(
+                $(#[$cfg_flag])?
+                impl Storable for $type {
+                    fn dtype(&self) -> DType {
+                        DType::$name
+                    }
+                }
+
+                $(#[$cfg_flag])?
+                impl Storable for Option<$type> {
+                    fn dtype(&self) -> DType {
+                        DType::[<Opt $name>]
+                    }
+                }
+            )*
         }
     };
 }
