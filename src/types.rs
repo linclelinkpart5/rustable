@@ -19,16 +19,16 @@ macro_rules! define_types {
                 $( $(#[$cfg_flag])? $l_name, $(#[$cfg_flag])? [<Opt $l_name>] ),*
             }
 
-            /// Provides references to elements within a potentially heterogeneous
-            /// row for data.
+            /// Provides references to elements within a potentially
+            /// heterogeneous row of data.
             #[derive(PartialEq)]
             pub enum Datum<'a> {
                 $( $(#[$cfg_flag])? $s_name(&'a $type) ),*
             }
 
             /// An enum representation of a `Series`, typically only seen when
-            /// trying to get a reference to a column from a `Frame` without knowing
-            /// its type beforehand.
+            /// trying to get a reference to a column from a `Frame` without
+            /// knowing its type beforehand.
             pub enum Column {
 
             }
@@ -42,27 +42,27 @@ define_types!(
     (i16, I16, I16),
     (i32, I32, I32),
     (i64, I64, I64),
-    (isize, ISIZE, ISIZE),
+    (isize, ISize, ISize),
     (i128, I128, I128, cfg(feature = "128")),
 
     (u8, U8, U8),
     (u16, U16, U16),
     (u32, U32, U32),
     (u64, U64, U64),
-    (usize, USIZE, USIZE),
+    (usize, USize, USize),
     (u128, U128, U128, cfg(feature = "128")),
 
     (f32, F32, F32),
     (f64, F64, F64),
 
-    (char, CHAR, CHAR),
-    (bool, BOOL, BOOL),
+    (char, Char, Char),
+    (bool, Bool, Bool),
 
-    (String, STRING, STRING),
+    (String, Str, Str),
 
-    (Decimal, DECIMAL, DECIMAL, cfg(feature = "decimal")),
+    (Decimal, Decimal, Decimal, cfg(feature = "decimal")),
 
-    (Date, DATE, DATE, cfg(feature = "date-time")),
-    (Time, TIME, TIME, cfg(feature = "date-time")),
-    (DateTime, DATETIME, DATETIME, cfg(feature = "date-time")),
+    (Date, Date, Date, cfg(feature = "date-time")),
+    (Time, Time, Time, cfg(feature = "date-time")),
+    (DateTime, DateTime, DateTime, cfg(feature = "date-time")),
 );
