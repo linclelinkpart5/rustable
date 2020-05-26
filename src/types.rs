@@ -12,24 +12,26 @@ pub use chrono::naive::{
 /// Helper macro to create the plumbing for each type supported in `rustable`.
 macro_rules! define_types {
     ( $( ($type:ty, $s_name:ident, $l_name:ident $( , $cfg_flag:meta )?), )+ ) => {
-        /// Represents all data types supported by `rustable`.
-        #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-        pub enum DType {
-            $( $(#[$cfg_flag])? $l_name ),*
-        }
+        paste::item! {
+            /// Represents all data types supported by `rustable`.
+            #[derive(Debug, PartialEq, Eq, Copy, Clone)]
+            pub enum DType {
+                $( $(#[$cfg_flag])? $l_name, $(#[$cfg_flag])? [<Opt $l_name>] ),*
+            }
 
-        /// Provides references to elements within a potentially heterogeneous
-        /// row for data.
-        #[derive(PartialEq)]
-        pub enum Datum<'a> {
-            $( $(#[$cfg_flag])? $s_name(&'a $type) ),*
-        }
+            /// Provides references to elements within a potentially heterogeneous
+            /// row for data.
+            #[derive(PartialEq)]
+            pub enum Datum<'a> {
+                $( $(#[$cfg_flag])? $s_name(&'a $type) ),*
+            }
 
-        /// An enum representation of a `Series`, typically only seen when
-        /// trying to get a reference to a column from a `Frame` without knowing
-        /// its type beforehand.
-        pub enum Column {
+            /// An enum representation of a `Series`, typically only seen when
+            /// trying to get a reference to a column from a `Frame` without knowing
+            /// its type beforehand.
+            pub enum Column {
 
+            }
         }
     };
 }
