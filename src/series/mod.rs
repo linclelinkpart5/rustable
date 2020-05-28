@@ -26,7 +26,7 @@ where
         V::dtype()
     }
 
-    /// Returns a readonly reference the the `Index` contained in this `Series`,
+    /// Returns a readonly reference to the `Index` contained in this `Series`,
     /// if there is one.
     pub fn index(&self) -> Option<&Index<K>> {
         self.index.as_ref()
