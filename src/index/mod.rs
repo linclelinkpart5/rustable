@@ -1,6 +1,7 @@
 
 pub mod iter;
 
+use std::borrow::Borrow;
 use std::hash::Hash;
 
 use indexmap::IndexSet as Set;
@@ -55,6 +56,14 @@ where
     //       flavor of this method.
     pub fn iter(&self) -> Iter<'_, K> {
         Iter(self.0.iter())
+    }
+
+    pub fn contains<Q>(&self, label: &Q) -> bool
+    where
+        K: Borrow<Q>,
+        Q: Hash + Eq,
+    {
+        self.0.contains(label)
     }
 }
 
