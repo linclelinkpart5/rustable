@@ -6,28 +6,22 @@ use std::hash::Hash;
 
 use indexmap::IndexSet as Set;
 
-use crate::traits::Storable;
+use crate::traits::Label;
 
 use self::iter::Iter;
 use self::iter::IntoIter;
 
 #[derive(Debug)]
-pub struct Index<K>(Set<K>)
-where
-    K: Storable + Eq + Hash,
-;
+pub struct Index<L: Label>(Set<L>);
 
-impl<K> Index<K>
-where
-    K: Storable + Eq + Hash,
-{
+impl<L: Label> Index<L> {
     pub fn new() -> Self {
         Self::default()
     }
 
     pub fn from_labels<I>(iter: I) -> Self
     where
-        I: IntoIterator<Item = K>,
+        I: IntoIterator<Item = L>,
     {
         Self(iter.into_iter().collect())
     }
@@ -48,42 +42,36 @@ where
         self.0.clear()
     }
 
-    pub fn push(&mut self, key: K) -> bool {
+    pub fn push(&mut self, key: L) -> bool {
         self.0.insert(key)
     }
 
     // NOTE: This will always be in "iloc" order, so no need to provide a "full"
     //       flavor of this method.
-    pub fn iter(&self) -> Iter<'_, K> {
+    pub fn iter(&self) -> Iter<'_, L> {
         Iter(self.0.iter())
     }
 
     pub fn contains<Q>(&self, label: &Q) -> bool
     where
-        K: Borrow<Q>,
+        L: Borrow<Q>,
         Q: Hash + Eq,
     {
         self.0.contains(label)
     }
 }
 
-// NOTE: This is needed because `#[derive(Default)]` only works if the type `K`
+// NOTE: This is needed because `#[derive(Default)]` only works if the type `L`
 // is also `Default`, for some reason!
-impl<K> Default for Index<K>
-where
-    K: Storable + Eq + Hash,
-{
+impl<L: Label> Default for Index<L> {
     fn default() -> Self {
         Self(Set::new())
     }
 }
 
-impl<K> IntoIterator for Index<K>
-where
-    K: Storable + Eq + Hash,
-{
-    type Item = K;
-    type IntoIter = IntoIter<K>;
+impl<L: Label> IntoIterator for Index<L> {
+    type Item = L;
+    type IntoIter = IntoIter<L>;
 
     fn into_iter(self) -> Self::IntoIter {
         IntoIter(self.0.into_iter())
