@@ -1,20 +1,12 @@
 
 //! Iterators for use with `Index`.
 
-use std::hash::Hash;
+use crate::traits::Label;
 
-use crate::traits::Storable;
+pub struct Iter<'a, L: Label>(pub(crate) indexmap::set::Iter<'a, L>);
 
-pub struct Iter<'a, K>(pub(crate) indexmap::set::Iter<'a, K>)
-where
-    K: Storable + Eq + Hash
-;
-
-impl<'a, K> Iterator for Iter<'a, K>
-where
-    K: Storable + Eq + Hash,
-{
-    type Item = &'a K;
+impl<'a, L: Label> Iterator for Iter<'a, L> {
+    type Item = &'a L;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next()
@@ -25,16 +17,10 @@ where
     }
 }
 
-pub struct IntoIter<K>(pub(crate) indexmap::set::IntoIter<K>)
-where
-    K: Storable + Eq + Hash,
-;
+pub struct IntoIter<L: Label>(pub(crate) indexmap::set::IntoIter<L>);
 
-impl<K> Iterator for IntoIter<K>
-where
-    K: Storable + Eq + Hash,
-{
-    type Item = K;
+impl<L: Label> Iterator for IntoIter<L> {
+    type Item = L;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next()
