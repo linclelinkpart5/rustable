@@ -1,9 +1,14 @@
 
+pub mod iter;
+
 use std::hash::Hash;
 
 use indexmap::IndexSet as Set;
 
 use crate::traits::Storable;
+
+use self::iter::Iter;
+use self::iter::IntoIter;
 
 #[derive(Debug)]
 pub struct Index<K>(Set<K>)
@@ -46,6 +51,8 @@ where
         self.0.insert(key)
     }
 
+    // NOTE: This will always be in "iloc" order, so no need to provide a "full"
+    //       flavor of this method.
     pub fn iter(&self) -> Iter<'_, K> {
         Iter(self.0.iter())
     }
@@ -71,41 +78,5 @@ where
 
     fn into_iter(self) -> Self::IntoIter {
         IntoIter(self.0.into_iter())
-    }
-}
-
-pub struct Iter<'a, K>(indexmap::set::Iter<'a, K>)
-where
-    K: Storable + Eq + Hash
-;
-
-impl<'a, K> Iterator for Iter<'a, K>
-where
-    K: Storable + Eq + Hash,
-{
-    type Item = &'a K;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.next()
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.0.size_hint()
-    }
-}
-
-pub struct IntoIter<K>(indexmap::set::IntoIter<K>)
-where
-    K: Storable + Eq + Hash,
-;
-
-impl<K> Iterator for IntoIter<K>
-where
-    K: Storable + Eq + Hash,
-{
-    type Item = K;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.next()
     }
 }
