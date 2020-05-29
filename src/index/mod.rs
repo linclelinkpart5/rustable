@@ -10,6 +10,10 @@ use crate::traits::Label;
 
 use self::iter::Iter;
 use self::iter::IntoIter;
+use self::iter::Diff;
+use self::iter::SymDiff;
+use self::iter::Inter;
+use self::iter::Union;
 
 #[derive(Debug)]
 pub struct Index<L: Label>(Set<L>);
@@ -55,6 +59,22 @@ impl<L: Label> Index<L> {
         Q: Hash + Eq,
     {
         self.0.contains(label)
+    }
+
+    pub fn diff<'a>(&'a self, other: &'a Self) -> Diff<'a, L> {
+        Diff::new(self, other)
+    }
+
+    pub fn sym_diff<'a>(&'a self, other: &'a Self) -> SymDiff<'a, L> {
+        SymDiff::new(self, other)
+    }
+
+    pub fn inter<'a>(&'a self, other: &'a Self) -> Inter<'a, L> {
+        Inter::new(self, other)
+    }
+
+    pub fn union<'a>(&'a self, other: &'a Self) -> Union<'a, L> {
+        Union::new(self, other)
     }
 }
 
