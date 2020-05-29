@@ -35,6 +35,10 @@ impl<L: Label> Iterator for IntoIter<L> {
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next()
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
+    }
 }
 
 impl<L: Label> DoubleEndedIterator for IntoIter<L> {

@@ -19,10 +19,7 @@ impl<L: Label> Index<L> {
         Self::default()
     }
 
-    pub fn from_labels<I>(iter: I) -> Self
-    where
-        I: IntoIterator<Item = L>,
-    {
+    pub fn from_labels<I: IntoIterator<Item = L>>(iter: I) -> Self {
         Self(iter.into_iter().collect())
     }
 
