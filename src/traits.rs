@@ -11,6 +11,6 @@ pub trait Storable: Debug + Clone + Send + Sized {
 }
 
 /// Trait that defines what is needed for a label in an `Index`.
-pub trait Label: Storable + Eq + Hash {}
+pub trait Label: Storable + Eq + Hash + Ord {}
 
-impl<T: Storable + Eq + Hash> Label for T {}
+impl<T: Storable + Eq + Hash + Ord> Label for T {}

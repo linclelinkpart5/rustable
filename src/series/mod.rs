@@ -3,13 +3,14 @@ use std::borrow::Borrow;
 use std::hash::Hash;
 
 use crate::traits::Storable;
+use crate::traits::Label;
 use crate::types::DType;
 use crate::index::Index;
 
 #[derive(Debug, Default)]
 pub struct Series<K, V>
 where
-    K: Storable + Hash + Eq,
+    K: Label,
     V: Storable,
 {
     index: Option<Index<K>>,
@@ -18,7 +19,7 @@ where
 
 impl<K, V> Series<K, V>
 where
-    K: Storable + Hash + Eq,
+    K: Label,
     V: Storable,
 {
     /// Returns the `DType` of this `Series`.

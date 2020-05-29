@@ -2,11 +2,13 @@
 pub mod iter;
 
 use std::borrow::Borrow;
+use std::cmp::Ordering;
 use std::hash::Hash;
 
 use indexmap::IndexSet as Set;
 
 use crate::traits::Label;
+use crate::types::DType;
 
 use self::iter::Iter;
 use self::iter::IntoIter;
@@ -15,7 +17,7 @@ use self::iter::SymDiff;
 use self::iter::Inter;
 use self::iter::Union;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Index<L: Label>(Set<L>);
 
 impl<L: Label> Index<L> {
@@ -23,6 +25,11 @@ impl<L: Label> Index<L> {
         Self::default()
     }
 
+    pub fn dtype(&self) -> DType {
+        L::dtype()
+    }
+
+    // TODO: Perhaps have this error when given duplicated keys?
     pub fn from_labels<I: IntoIterator<Item = L>>(iter: I) -> Self {
         Self(iter.into_iter().collect())
     }
@@ -75,6 +82,14 @@ impl<L: Label> Index<L> {
 
     pub fn union<'a>(&'a self, other: &'a Self) -> Union<'a, L> {
         Union::new(self, other)
+    }
+
+    pub fn sort(&mut self) {
+        self.0.sort()
+    }
+
+    pub fn sort_by<F: FnMut(&L, &L) -> Ordering>(&mut self, compare: F) {
+        self.0.sort_by(compare)
     }
 }
 
