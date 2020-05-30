@@ -4,6 +4,7 @@ pub mod iter;
 use std::borrow::Borrow;
 use std::cmp::Ordering;
 use std::hash::Hash;
+use std::iter::FromIterator;
 
 use indexmap::IndexSet as Set;
 
@@ -25,12 +26,12 @@ impl<L: Label> Index<L> {
         Self::default()
     }
 
-    pub fn dtype(&self) -> DType {
-        L::dtype()
+    pub fn from_vec(vec: Vec<L>) -> Self {
+        Self::from_iter(vec)
     }
 
-    pub fn from_vec(vec: Vec<L>) -> Self {
-        Self(vec.into_iter().collect())
+    pub fn dtype(&self) -> DType {
+        L::dtype()
     }
 
     pub fn len(&self) -> usize {
@@ -116,9 +117,32 @@ impl<L: Label> Index<L> {
     }
 }
 
-impl<L: Label + Copy> Index<L> {
+// Handles loading from `&[0u32, 1, 2]`.
+impl<'a, L> Index<L>
+where
+    L: Label + Copy,
+{
     pub fn from_slice(slice: &[L]) -> Self {
-        Self(slice.iter().copied().collect())
+        Self::from_iter(slice)
+    }
+}
+
+impl<L> FromIterator<L> for Index<L>
+where
+    L: Label,
+{
+    fn from_iter<I: IntoIterator<Item = L>>(iter: I) -> Self {
+        Self(iter.into_iter().collect())
+    }
+}
+
+// Handles `Index::from(&[0u32, 1, 2])`.
+impl<'a, L: 'a> FromIterator<&'a L> for Index<L>
+where
+    L: Label + Copy,
+{
+    fn from_iter<I: IntoIterator<Item = &'a L>>(iter: I) -> Self {
+        Self(iter.into_iter().copied().collect())
     }
 }
 
@@ -145,7 +169,7 @@ mod tests {
 
     #[test]
     fn loc_multi() {
-        let index = Index::from_slice(&[1u32, 2, 3, 4, 5]);
+        let index = Index::from_iter(&[1u32, 2, 3, 4, 5]);
         assert!(index.loc_multi(&[]).is_some());
         assert!(index.loc_multi(&[1, 3, 2]).is_some());
         assert!(index.loc_multi(&[1, 3, 2, 1, 9]).is_none());
