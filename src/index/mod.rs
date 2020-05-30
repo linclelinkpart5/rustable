@@ -29,9 +29,8 @@ impl<L: Label> Index<L> {
         L::dtype()
     }
 
-    // TODO: Perhaps have this error when given duplicated keys?
-    pub fn from_labels<I: IntoIterator<Item = L>>(iter: I) -> Self {
-        Self(iter.into_iter().collect())
+    pub fn from_vec(vec: Vec<L>) -> Self {
+        Self(vec.into_iter().collect())
     }
 
     pub fn len(&self) -> usize {
@@ -117,6 +116,12 @@ impl<L: Label> Index<L> {
     }
 }
 
+impl<L: Label + Copy> Index<L> {
+    pub fn from_slice(slice: &[L]) -> Self {
+        Self(slice.iter().copied().collect())
+    }
+}
+
 // NOTE: This is needed because `#[derive(Default)]` only works if the type `L`
 // is also `Default`, for some reason!
 impl<L: Label> Default for Index<L> {
@@ -131,5 +136,18 @@ impl<L: Label> IntoIterator for Index<L> {
 
     fn into_iter(self) -> Self::IntoIter {
         IntoIter(self.0.into_iter())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn loc_multi() {
+        let index = Index::from_slice(&[1u32, 2, 3, 4, 5]);
+        assert!(index.loc_multi(&[]).is_some());
+        assert!(index.loc_multi(&[1, 3, 2]).is_some());
+        assert!(index.loc_multi(&[1, 3, 2, 1, 9]).is_none());
     }
 }
