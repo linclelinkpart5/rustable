@@ -91,6 +91,14 @@ impl<L: Label> Index<L> {
     pub fn sort_by<F: FnMut(&L, &L) -> Ordering>(&mut self, compare: F) {
         self.0.sort_by(compare)
     }
+
+    fn loc_to_iloc<Q>(&self, loc: &Q) -> Option<usize>
+    where
+        L: Borrow<Q>,
+        Q: Hash + Eq,
+    {
+        self.0.get_full(loc).map(|(index, _)| index)
+    }
 }
 
 // NOTE: This is needed because `#[derive(Default)]` only works if the type `L`
