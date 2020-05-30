@@ -92,12 +92,28 @@ impl<L: Label> Index<L> {
         self.0.sort_by(compare)
     }
 
-    fn loc_to_iloc<Q>(&self, loc: &Q) -> Option<usize>
+    pub fn loc<Q>(&self, loc: &Q) -> Option<usize>
     where
         L: Borrow<Q>,
         Q: Hash + Eq,
     {
         self.0.get_full(loc).map(|(index, _)| index)
+    }
+
+    pub fn loc_multi<Q, A>(&self, locs: &A) -> Option<Vec<usize>>
+    where
+        L: Borrow<Q>,
+        Q: Hash + Eq,
+        A: AsRef<[Q]>,
+    {
+        let locs = locs.as_ref();
+
+        let mut results = Vec::new();
+        for loc in locs {
+            results.push(self.loc(loc)?);
+        }
+
+        Some(results)
     }
 }
 
