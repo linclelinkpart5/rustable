@@ -1,6 +1,8 @@
 
 //! Iterators for use with `Index`.
 
+use std::borrow::Borrow;
+use std::hash::Hash;
 use std::iter::Chain;
 
 use crate::traits::Label;
@@ -172,5 +174,54 @@ impl<'a, L: Label> Iterator for Union<'a, L> {
 impl<'a, L: Label> DoubleEndedIterator for Union<'a, L> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.0.next_back()
+    }
+}
+
+/// A lazy iterator that yields iloc indices from multiple loc indices.
+pub struct LocMulti<'a, I, L, Q: 'a>(I, &'a Index<L>)
+where
+    I: Iterator<Item = &'a Q>,
+    L: Label + Borrow<Q>,
+    Q: Hash + Eq,
+;
+
+impl<'a, I, L, Q: 'a> LocMulti<'a, I, L, Q>
+where
+    I: Iterator<Item = &'a Q>,
+    L: Label + Borrow<Q>,
+    Q: Hash + Eq,
+{
+    pub(crate) fn new(iter: I, index: &'a Index<L>) -> Self {
+        Self(iter, index)
+    }
+}
+
+impl<'a, I, L, Q> Iterator for LocMulti<'a, I, L, Q>
+where
+    I: Iterator<Item = &'a Q>,
+    L: Label + Borrow<Q>,
+    Q: Hash + Eq,
+{
+    type Item = Option<usize>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let label = self.0.next()?;
+        Some(self.1.loc(label))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
+    }
+}
+
+impl<'a, I, L, Q> DoubleEndedIterator for LocMulti<'a, I, L, Q>
+where
+    I: Iterator<Item = &'a Q> + DoubleEndedIterator,
+    L: Label + Borrow<Q>,
+    Q: Hash + Eq,
+{
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let label = self.0.next_back()?;
+        Some(self.1.loc(label))
     }
 }

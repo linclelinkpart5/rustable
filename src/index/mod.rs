@@ -17,6 +17,7 @@ use self::iter::Diff;
 use self::iter::SymDiff;
 use self::iter::Inter;
 use self::iter::Union;
+use self::iter::LocMulti;
 
 #[derive(Debug, Clone)]
 pub struct Index<L: Label>(Set<L>);
@@ -92,6 +93,10 @@ impl<L: Label> Index<L> {
         self.0.sort_by(compare)
     }
 
+    pub fn iloc(&self, iloc: usize) -> Option<usize> {
+        if iloc < self.0.len() { Some(iloc) } else { None }
+    }
+
     pub fn loc<Q>(&self, loc: &Q) -> Option<usize>
     where
         L: Borrow<Q>,
@@ -100,20 +105,13 @@ impl<L: Label> Index<L> {
         self.0.get_full(loc).map(|(index, _)| index)
     }
 
-    pub fn loc_multi<Q, A>(&self, locs: &A) -> Option<Vec<usize>>
+    pub fn loc_multi<'a, I, Q>(&'a self, locs: I) -> LocMulti<'a, I::IntoIter, L, Q>
     where
+        I: IntoIterator<Item = &'a Q>,
         L: Borrow<Q>,
         Q: Hash + Eq,
-        A: AsRef<[Q]>,
     {
-        let locs = locs.as_ref();
-
-        let mut results = Vec::new();
-        for loc in locs {
-            results.push(self.loc(loc)?);
-        }
-
-        Some(results)
+        LocMulti::new(locs.into_iter(), self)
     }
 }
 
@@ -169,9 +167,33 @@ mod tests {
 
     #[test]
     fn loc_multi() {
-        let index = Index::from_iter(&[1u32, 2, 3, 4, 5]);
-        assert!(index.loc_multi(&[]).is_some());
-        assert!(index.loc_multi(&[1, 3, 2]).is_some());
-        assert!(index.loc_multi(&[1, 3, 2, 1, 9]).is_none());
+        let index = Index::from_iter(&[10u32, 20, 30, 40, 50]);
+
+        let mut iter = index.loc_multi(&[]);
+        assert_eq!(iter.next(), None);
+
+        let mut iter = index.loc_multi(&[10, 20, 30, 40, 50]);
+        assert_eq!(iter.next(), Some(Some(0)));
+        assert_eq!(iter.next(), Some(Some(1)));
+        assert_eq!(iter.next(), Some(Some(2)));
+        assert_eq!(iter.next(), Some(Some(3)));
+        assert_eq!(iter.next(), Some(Some(4)));
+        assert_eq!(iter.next(), None);
+
+        let mut iter = index.loc_multi(&[50, 40, 30, 20, 10]);
+        assert_eq!(iter.next(), Some(Some(4)));
+        assert_eq!(iter.next(), Some(Some(3)));
+        assert_eq!(iter.next(), Some(Some(2)));
+        assert_eq!(iter.next(), Some(Some(1)));
+        assert_eq!(iter.next(), Some(Some(0)));
+        assert_eq!(iter.next(), None);
+
+        let mut iter = index.loc_multi(&[10, 20, 99, 40, 88]);
+        assert_eq!(iter.next(), Some(Some(0)));
+        assert_eq!(iter.next(), Some(Some(1)));
+        assert_eq!(iter.next(), Some(None));
+        assert_eq!(iter.next(), Some(Some(3)));
+        assert_eq!(iter.next(), Some(None));
+        assert_eq!(iter.next(), None);
     }
 }
