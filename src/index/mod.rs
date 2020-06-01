@@ -19,7 +19,6 @@ use self::iter::Diff;
 use self::iter::SymDiff;
 use self::iter::Inter;
 use self::iter::Union;
-use self::iter::LocMulti;
 
 #[derive(Debug, Clone)]
 pub struct Index<L: Label>(Set<L>);
@@ -113,19 +112,19 @@ impl<L: Label> Index<L> {
     {
         // TODO: When `rust: range_is_empty #48111` is stabilized,
         //       use that as a short circuit.
-        let start_iloc = match range.start_bound() {
-            Bound::Included(iloc) => self.iloc(*iloc)?,
-            Bound::Excluded(iloc) => self.iloc(*iloc)? + 1,
+        let start_idx = match range.start_bound() {
+            Bound::Included(idx) => self.iloc(*idx)?,
+            Bound::Excluded(idx) => self.iloc(*idx)? + 1,
             Bound::Unbounded => 0,
         };
 
-        let close_iloc = match range.end_bound() {
-            Bound::Included(iloc) => self.iloc(*iloc)? + 1,
-            Bound::Excluded(iloc) => self.iloc(*iloc)?,
+        let close_idx = match range.end_bound() {
+            Bound::Included(idx) => self.iloc(*idx)? + 1,
+            Bound::Excluded(idx) => self.iloc(*idx)?,
             Bound::Unbounded => self.len(),
         };
 
-        self.iloc_multi(start_iloc..close_iloc)
+        self.iloc_multi(start_idx..close_idx)
     }
 
     pub fn bloc<A>(&self, bools: A) -> Option<Vec<usize>>
@@ -151,7 +150,37 @@ impl<L: Label> Index<L> {
         L: Borrow<Q>,
         Q: Hash + Eq,
     {
-        self.0.get_full(loc).map(|(index, _)| index)
+        self.0.get_full(loc).map(|(idx, _)| idx)
+    }
+
+    pub fn loc_multi<'a, I, Q: 'a>(&self, lbls: I) -> Option<Vec<usize>>
+    where
+        I: IntoIterator<Item = &'a Q>,
+        L: Borrow<Q>,
+        Q: Hash + Eq,
+    {
+        lbls.into_iter().map(|lbl| self.loc(lbl)).collect::<Option<Vec<_>>>()
+    }
+
+    pub fn loc_range<'a, R, Q: 'a>(&self, range: R) -> Option<Vec<usize>>
+    where
+        R: RangeBounds<&'a Q>,
+        L: Borrow<Q>,
+        Q: Hash + Eq,
+    {
+        let start_idx = match range.start_bound() {
+            Bound::Included(lbl) => self.loc(*lbl)?,
+            Bound::Excluded(lbl) => self.loc(*lbl)? + 1,
+            Bound::Unbounded => 0,
+        };
+
+        let close_idx = match range.end_bound() {
+            Bound::Included(lbl) => self.loc(*lbl)? + 1,
+            Bound::Excluded(lbl) => self.loc(*lbl)?,
+            Bound::Unbounded => self.len(),
+        };
+
+        self.iloc_multi(start_idx..close_idx)
     }
 }
 
@@ -201,31 +230,25 @@ mod tests {
     fn loc_multi() {
         let index = Index::from_iter(&[10u32, 20, 30, 40, 50]);
 
-        // let mut iter = index.loc_multi(&[]);
-        // assert_eq!(iter.next(), None);
+        let out = index.loc_multi(&[]);
+        assert_eq!(Some(vec![]), out);
 
-        // let mut iter = index.loc_multi(&[10, 20, 30, 40, 50]);
-        // assert_eq!(iter.next(), Some(Some(0)));
-        // assert_eq!(iter.next(), Some(Some(1)));
-        // assert_eq!(iter.next(), Some(Some(2)));
-        // assert_eq!(iter.next(), Some(Some(3)));
-        // assert_eq!(iter.next(), Some(Some(4)));
-        // assert_eq!(iter.next(), None);
+        let out = index.loc_multi(&[30]);
+        assert_eq!(Some(vec![2]), out);
 
-        // let mut iter = index.loc_multi(&[50, 40, 30, 20, 10]);
-        // assert_eq!(iter.next(), Some(Some(4)));
-        // assert_eq!(iter.next(), Some(Some(3)));
-        // assert_eq!(iter.next(), Some(Some(2)));
-        // assert_eq!(iter.next(), Some(Some(1)));
-        // assert_eq!(iter.next(), Some(Some(0)));
-        // assert_eq!(iter.next(), None);
+        let out = index.loc_multi(&[10, 20, 30, 40, 50]);
+        assert_eq!(Some(vec![0, 1, 2, 3, 4]), out);
 
-        // let mut iter = index.loc_multi(&[10, 20, 99, 40, 88]);
-        // assert_eq!(iter.next(), Some(Some(0)));
-        // assert_eq!(iter.next(), Some(Some(1)));
-        // assert_eq!(iter.next(), Some(None));
-        // assert_eq!(iter.next(), Some(Some(3)));
-        // assert_eq!(iter.next(), Some(None));
-        // assert_eq!(iter.next(), None);
+        let out = index.loc_multi(&[50, 40, 30, 20, 10]);
+        assert_eq!(Some(vec![4, 3, 2, 1, 0]), out);
+
+        let out = index.loc_multi(&[99]);
+        assert_eq!(None, out);
+
+        let out = index.loc_multi(&[99, 20, 30, 40, 50]);
+        assert_eq!(None, out);
+
+        let out = index.loc_multi(&[10, 20, 30, 40, 99]);
+        assert_eq!(None, out);
     }
 }
