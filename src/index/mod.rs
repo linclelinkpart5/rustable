@@ -65,7 +65,7 @@ impl<L: Label> Index<L> {
     pub fn contains<Q>(&self, label: &Q) -> bool
     where
         L: Borrow<Q>,
-        Q: Hash + Eq,
+        Q: Hash + Eq + ?Sized,
     {
         self.0.contains(label)
     }
@@ -95,8 +95,7 @@ impl<L: Label> Index<L> {
     }
 
     pub fn iloc(&self, idx: usize) -> Option<usize> {
-        // NOTE: Doing this in a weird way to reuse internal indexing logic.
-        self.0.get_index(idx).map(|_| idx)
+        if idx < self.0.len() { Some(idx) } else { None }
     }
 
     pub fn iloc_multi<I>(&self, idxs: I) -> Option<Vec<usize>>
@@ -110,17 +109,18 @@ impl<L: Label> Index<L> {
     where
         R: RangeBounds<usize>,
     {
+        // TODO: ALWAYS VALIDATE BOUNDS, EVEN IF RANGE WOULD BE EMPTY.
         // TODO: When `rust: range_is_empty #48111` is stabilized,
         //       use that as a short circuit.
         let start_idx = match range.start_bound() {
-            Bound::Included(idx) => self.iloc(*idx)?,
-            Bound::Excluded(idx) => self.iloc(*idx)? + 1,
+            Bound::Included(idx) => Some(*idx).filter(|x| x < &self.len())?,
+            Bound::Excluded(idx) => Some(*idx).filter(|x| x <= &self.len())?,
             Bound::Unbounded => 0,
         };
 
         let close_idx = match range.end_bound() {
-            Bound::Included(idx) => self.iloc(*idx)? + 1,
-            Bound::Excluded(idx) => self.iloc(*idx)?,
+            Bound::Included(idx) => Some(*idx).filter(|x| x < &self.len())?,
+            Bound::Excluded(idx) => Some(*idx).filter(|x| x <= &self.len())?,
             Bound::Unbounded => self.len(),
         };
 
@@ -148,7 +148,7 @@ impl<L: Label> Index<L> {
     pub fn loc<Q>(&self, loc: &Q) -> Option<usize>
     where
         L: Borrow<Q>,
-        Q: Hash + Eq,
+        Q: Hash + Eq + ?Sized,
     {
         self.0.get_full(loc).map(|(idx, _)| idx)
     }
@@ -157,7 +157,7 @@ impl<L: Label> Index<L> {
     where
         I: IntoIterator<Item = &'a Q>,
         L: Borrow<Q>,
-        Q: Hash + Eq,
+        Q: Hash + Eq + ?Sized,
     {
         lbls.into_iter().map(|lbl| self.loc(lbl)).collect::<Option<Vec<_>>>()
     }
@@ -166,17 +166,17 @@ impl<L: Label> Index<L> {
     where
         R: RangeBounds<&'a Q>,
         L: Borrow<Q>,
-        Q: Hash + Eq,
+        Q: Hash + Eq + ?Sized,
     {
         let start_idx = match range.start_bound() {
-            Bound::Included(lbl) => self.loc(*lbl)?,
-            Bound::Excluded(lbl) => self.loc(*lbl)? + 1,
+            Bound::Included(lbl) => self.loc(lbl)?,
+            Bound::Excluded(lbl) => self.loc(lbl)? + 1,
             Bound::Unbounded => 0,
         };
 
         let close_idx = match range.end_bound() {
-            Bound::Included(lbl) => self.loc(*lbl)? + 1,
-            Bound::Excluded(lbl) => self.loc(*lbl)?,
+            Bound::Included(lbl) => self.loc(lbl)? + 1,
+            Bound::Excluded(lbl) => self.loc(lbl)?,
             Bound::Unbounded => self.len(),
         };
 
@@ -227,28 +227,74 @@ mod tests {
     use super::*;
 
     #[test]
+    fn loc() {
+        let i = Index::from_iter("ideographs".chars());
+
+        assert_eq!(Some(0), i.loc(&'i'));
+        assert_eq!(Some(1), i.loc(&'d'));
+        assert_eq!(Some(2), i.loc(&'e'));
+        assert_eq!(Some(3), i.loc(&'o'));
+        assert_eq!(Some(4), i.loc(&'g'));
+        assert_eq!(Some(5), i.loc(&'r'));
+        assert_eq!(Some(6), i.loc(&'a'));
+        assert_eq!(Some(7), i.loc(&'p'));
+        assert_eq!(Some(8), i.loc(&'h'));
+        assert_eq!(Some(9), i.loc(&'s'));
+        assert_eq!(None, i.loc(&'x'));
+    }
+
+    #[test]
     fn loc_multi() {
-        let index = Index::from_iter(&[10u32, 20, 30, 40, 50]);
+        let i = Index::from_slice(&[10u32, 20, 30, 40, 50]);
 
-        let out = index.loc_multi(&[]);
-        assert_eq!(Some(vec![]), out);
+        assert_eq!(i.loc_multi(&[]), Some(vec![]));
+        assert_eq!(i.loc_multi(&[30]), Some(vec![2]));
+        assert_eq!(i.loc_multi(&[10, 20, 30, 40]), Some(vec![0, 1, 2, 3]));
+        assert_eq!(i.loc_multi(&[50, 40, 30, 20]), Some(vec![4, 3, 2, 1]));
+        assert_eq!(i.loc_multi(&[99]), None);
+        assert_eq!(i.loc_multi(&[99, 20, 30, 40, 50]), None);
+        assert_eq!(i.loc_multi(&[10, 20, 30, 40, 99]), None);
+    }
 
-        let out = index.loc_multi(&[30]);
-        assert_eq!(Some(vec![2]), out);
+    #[test]
+    fn loc_range() {
+        let i = Index::from_iter("ideographs".chars());
+        assert_eq!(i.loc_range(&'o'..&'a'), Some(vec![3, 4, 5]));
+        assert_eq!(i.loc_range(&'o'..=&'a'), Some(vec![3, 4, 5, 6]));
 
-        let out = index.loc_multi(&[10, 20, 30, 40, 50]);
-        assert_eq!(Some(vec![0, 1, 2, 3, 4]), out);
+        assert_eq!(i.loc_range(..), i.iloc_range(0..i.len()));
+        assert_eq!(i.loc_range(..), i.loc_range(&'i'..=&'s'));
 
-        let out = index.loc_multi(&[50, 40, 30, 20, 10]);
-        assert_eq!(Some(vec![4, 3, 2, 1, 0]), out);
+        let i = Index::from_iter((1..=9).map(|i| i * 10));
 
-        let out = index.loc_multi(&[99]);
-        assert_eq!(None, out);
+        assert_eq!(i.loc_range(&20..&60), Some(vec![1, 2, 3, 4]));
+        assert_eq!(i.loc_range(&20..=&60), Some(vec![1, 2, 3, 4, 5]));
+        assert_eq!(i.loc_range(&30..), Some(vec![2, 3, 4, 5, 6, 7, 8]));
+        assert_eq!(i.loc_range(..&70), Some(vec![0, 1, 2, 3, 4, 5]));
+        assert_eq!(i.loc_range(..=&70), Some(vec![0, 1, 2, 3, 4, 5, 6]));
+        assert_eq!(i.loc_range(..), Some(vec![0, 1, 2, 3, 4, 5, 6, 7, 8]));
+        assert_eq!(i.loc_range(&50..&50), Some(vec![]));
+        assert_eq!(i.loc_range(&50..=&50), Some(vec![4]));
+        assert_eq!(i.loc_range(&60..&40), Some(vec![]));
+        assert_eq!(i.loc_range(&60..=&40), Some(vec![]));
+        assert_eq!(i.loc_range(&10..&99), None);
+        assert_eq!(i.loc_range(&10..=&99), None);
+        assert_eq!(i.loc_range(&99..&10), None);
+        assert_eq!(i.loc_range(&99..=&10), None);
+        assert_eq!(i.loc_range(..&99), None);
+        assert_eq!(i.loc_range(..=&99), None);
+        assert_eq!(i.loc_range(&99..), None);
 
-        let out = index.loc_multi(&[99, 20, 30, 40, 50]);
-        assert_eq!(None, out);
+        let i = Index::from_vec(vec![
+            String::from("Numi"),
+            String::from("Kova"),
+            String::from("Dutchess"),
+            String::from("Keya"),
+            String::from("Chibi"),
+            String::from("Toby"),
+        ]);
 
-        let out = index.loc_multi(&[10, 20, 30, 40, 99]);
-        assert_eq!(None, out);
+        let out = i.loc_range("Kova".."Chibi");
+        assert_eq!(Some(vec![1, 2, 3]), out);
     }
 }
