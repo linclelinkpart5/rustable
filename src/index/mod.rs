@@ -5,6 +5,8 @@ use std::borrow::Borrow;
 use std::cmp::Ordering;
 use std::hash::Hash;
 use std::iter::FromIterator;
+use std::ops::Bound;
+use std::ops::RangeBounds;
 
 use indexmap::IndexSet as Set;
 
@@ -93,8 +95,55 @@ impl<L: Label> Index<L> {
         self.0.sort_by(compare)
     }
 
-    pub fn iloc(&self, iloc: usize) -> Option<usize> {
-        if iloc < self.0.len() { Some(iloc) } else { None }
+    pub fn iloc(&self, idx: usize) -> Option<usize> {
+        // NOTE: Doing this in a weird way to reuse internal indexing logic.
+        self.0.get_index(idx).map(|_| idx)
+    }
+
+    pub fn iloc_multi<I>(&self, idxs: I) -> Option<Vec<usize>>
+    where
+        I: IntoIterator<Item = usize>,
+    {
+        idxs.into_iter().map(|idx| self.iloc(idx)).collect::<Option<Vec<_>>>()
+    }
+
+    pub fn iloc_range<R>(&self, range: R) -> Option<Vec<usize>>
+    where
+        R: RangeBounds<usize>,
+    {
+        // TODO: When `rust: range_is_empty #48111` is stabilized,
+        //       use that as a short circuit.
+        let start_iloc = match range.start_bound() {
+            Bound::Included(iloc) => self.iloc(*iloc)?,
+            Bound::Excluded(iloc) => self.iloc(*iloc)? + 1,
+            Bound::Unbounded => 0,
+        };
+
+        let close_iloc = match range.end_bound() {
+            Bound::Included(iloc) => self.iloc(*iloc)? + 1,
+            Bound::Excluded(iloc) => self.iloc(*iloc)?,
+            Bound::Unbounded => self.len(),
+        };
+
+        self.iloc_multi(start_iloc..close_iloc)
+    }
+
+    pub fn bloc<A>(&self, bools: A) -> Option<Vec<usize>>
+    where
+        A: AsRef<[bool]>,
+    {
+        let bools = bools.as_ref();
+
+        if bools.len() != self.len() { None }
+        else {
+            Some(
+                bools
+                .iter()
+                .enumerate()
+                .filter_map(|(i, &b)| if b { Some(i) } else { None })
+                .collect()
+            )
+        }
     }
 
     pub fn loc<Q>(&self, loc: &Q) -> Option<usize>
@@ -103,15 +152,6 @@ impl<L: Label> Index<L> {
         Q: Hash + Eq,
     {
         self.0.get_full(loc).map(|(index, _)| index)
-    }
-
-    pub fn loc_multi<'a, I, Q>(&'a self, locs: I) -> LocMulti<'a, I::IntoIter, L, Q>
-    where
-        I: IntoIterator<Item = &'a Q>,
-        L: Borrow<Q>,
-        Q: Hash + Eq,
-    {
-        LocMulti::new(locs.into_iter(), self)
     }
 }
 
@@ -125,27 +165,19 @@ where
     }
 }
 
-impl<L> FromIterator<L> for Index<L>
-where
-    L: Label,
-{
+impl<L: Label> FromIterator<L> for Index<L> {
     fn from_iter<I: IntoIterator<Item = L>>(iter: I) -> Self {
         Self(iter.into_iter().collect())
     }
 }
 
 // Handles `Index::from(&[0u32, 1, 2])`.
-impl<'a, L: 'a> FromIterator<&'a L> for Index<L>
-where
-    L: Label + Copy,
-{
+impl<'a, L: Label + Copy + 'a> FromIterator<&'a L> for Index<L> {
     fn from_iter<I: IntoIterator<Item = &'a L>>(iter: I) -> Self {
         Self(iter.into_iter().copied().collect())
     }
 }
 
-// NOTE: This is needed because `#[derive(Default)]` only works if the type `L`
-// is also `Default`, for some reason!
 impl<L: Label> Default for Index<L> {
     fn default() -> Self {
         Self(Set::new())
@@ -169,31 +201,31 @@ mod tests {
     fn loc_multi() {
         let index = Index::from_iter(&[10u32, 20, 30, 40, 50]);
 
-        let mut iter = index.loc_multi(&[]);
-        assert_eq!(iter.next(), None);
+        // let mut iter = index.loc_multi(&[]);
+        // assert_eq!(iter.next(), None);
 
-        let mut iter = index.loc_multi(&[10, 20, 30, 40, 50]);
-        assert_eq!(iter.next(), Some(Some(0)));
-        assert_eq!(iter.next(), Some(Some(1)));
-        assert_eq!(iter.next(), Some(Some(2)));
-        assert_eq!(iter.next(), Some(Some(3)));
-        assert_eq!(iter.next(), Some(Some(4)));
-        assert_eq!(iter.next(), None);
+        // let mut iter = index.loc_multi(&[10, 20, 30, 40, 50]);
+        // assert_eq!(iter.next(), Some(Some(0)));
+        // assert_eq!(iter.next(), Some(Some(1)));
+        // assert_eq!(iter.next(), Some(Some(2)));
+        // assert_eq!(iter.next(), Some(Some(3)));
+        // assert_eq!(iter.next(), Some(Some(4)));
+        // assert_eq!(iter.next(), None);
 
-        let mut iter = index.loc_multi(&[50, 40, 30, 20, 10]);
-        assert_eq!(iter.next(), Some(Some(4)));
-        assert_eq!(iter.next(), Some(Some(3)));
-        assert_eq!(iter.next(), Some(Some(2)));
-        assert_eq!(iter.next(), Some(Some(1)));
-        assert_eq!(iter.next(), Some(Some(0)));
-        assert_eq!(iter.next(), None);
+        // let mut iter = index.loc_multi(&[50, 40, 30, 20, 10]);
+        // assert_eq!(iter.next(), Some(Some(4)));
+        // assert_eq!(iter.next(), Some(Some(3)));
+        // assert_eq!(iter.next(), Some(Some(2)));
+        // assert_eq!(iter.next(), Some(Some(1)));
+        // assert_eq!(iter.next(), Some(Some(0)));
+        // assert_eq!(iter.next(), None);
 
-        let mut iter = index.loc_multi(&[10, 20, 99, 40, 88]);
-        assert_eq!(iter.next(), Some(Some(0)));
-        assert_eq!(iter.next(), Some(Some(1)));
-        assert_eq!(iter.next(), Some(None));
-        assert_eq!(iter.next(), Some(Some(3)));
-        assert_eq!(iter.next(), Some(None));
-        assert_eq!(iter.next(), None);
+        // let mut iter = index.loc_multi(&[10, 20, 99, 40, 88]);
+        // assert_eq!(iter.next(), Some(Some(0)));
+        // assert_eq!(iter.next(), Some(Some(1)));
+        // assert_eq!(iter.next(), Some(None));
+        // assert_eq!(iter.next(), Some(Some(3)));
+        // assert_eq!(iter.next(), Some(None));
+        // assert_eq!(iter.next(), None);
     }
 }
