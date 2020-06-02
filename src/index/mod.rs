@@ -8,7 +8,7 @@ use std::iter::FromIterator;
 use std::ops::Bound;
 use std::ops::RangeBounds;
 
-use indexmap::IndexSet as Set;
+use indexmap::IndexSet;
 
 use crate::traits::Label;
 use crate::types::DType;
@@ -21,7 +21,7 @@ use self::iter::Inter;
 use self::iter::Union;
 
 #[derive(Debug, Clone)]
-pub struct Index<L: Label>(Set<L>);
+pub struct Index<L: Label>(IndexSet<L>);
 
 impl<L: Label> Index<L> {
     pub fn new() -> Self {
@@ -114,12 +114,12 @@ impl<L: Label> Index<L> {
         //       use that as a short circuit.
         let start_idx = match range.start_bound() {
             Bound::Included(idx) => Some(*idx).filter(|x| x < &self.len())?,
-            Bound::Excluded(idx) => Some(*idx).filter(|x| x <= &self.len())?,
+            Bound::Excluded(idx) => Some(*idx).filter(|x| x <= &self.len())? + 1,
             Bound::Unbounded => 0,
         };
 
         let close_idx = match range.end_bound() {
-            Bound::Included(idx) => Some(*idx).filter(|x| x < &self.len())?,
+            Bound::Included(idx) => Some(*idx).filter(|x| x < &self.len())? + 1,
             Bound::Excluded(idx) => Some(*idx).filter(|x| x <= &self.len())?,
             Bound::Unbounded => self.len(),
         };
@@ -209,7 +209,7 @@ impl<'a, L: Label + Copy + 'a> FromIterator<&'a L> for Index<L> {
 
 impl<L: Label> Default for Index<L> {
     fn default() -> Self {
-        Self(Set::new())
+        Self(IndexSet::new())
     }
 }
 
@@ -258,43 +258,83 @@ mod tests {
 
     #[test]
     fn loc_range() {
-        let i = Index::from_iter("ideographs".chars());
-        assert_eq!(i.loc_range(&'o'..&'a'), Some(vec![3, 4, 5]));
-        assert_eq!(i.loc_range(&'o'..=&'a'), Some(vec![3, 4, 5, 6]));
+        let i = Index::from_iter("jihgfedcba".chars());
+
+        assert_eq!(i.loc_range(&'h'..&'c'), Some(vec![2, 3, 4, 5, 6]));
+        assert_eq!(i.loc_range(&'h'..=&'c'), Some(vec![2, 3, 4, 5, 6, 7]));
+        assert_eq!(i.loc_range(&'h'..), Some(vec![2, 3, 4, 5, 6, 7, 8, 9]));
+        assert_eq!(i.loc_range(..&'c'), Some(vec![0, 1, 2, 3, 4, 5, 6]));
+        assert_eq!(i.loc_range(..=&'c'), Some(vec![0, 1, 2, 3, 4, 5, 6, 7]));
+        assert_eq!(i.loc_range(..), Some(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]));
+        assert_eq!(i.loc_range(&'f'..&'e'), Some(vec![4]));
+        assert_eq!(i.loc_range(&'f'..=&'e'), Some(vec![4, 5]));
+        assert_eq!(i.loc_range(&'f'..&'f'), Some(vec![]));
+        assert_eq!(i.loc_range(&'f'..=&'f'), Some(vec![4]));
+        assert_eq!(i.loc_range(&'d'..&'g'), Some(vec![]));
+        assert_eq!(i.loc_range(&'d'..=&'g'), Some(vec![]));
+        assert_eq!(i.loc_range(&'e'..&'f'), Some(vec![]));
+        assert_eq!(i.loc_range(&'e'..=&'f'), Some(vec![]));
+        assert_eq!(i.loc_range(&'j'..&'x'), None);
+        assert_eq!(i.loc_range(&'j'..=&'x'), None);
+        assert_eq!(i.loc_range(&'x'..&'a'), None);
+        assert_eq!(i.loc_range(&'x'..=&'a'), None);
+        assert_eq!(i.loc_range(..&'x'), None);
+        assert_eq!(i.loc_range(..=&'x'), None);
+        assert_eq!(i.loc_range(&'x'..), None);
 
         assert_eq!(i.loc_range(..), i.iloc_range(0..i.len()));
-        assert_eq!(i.loc_range(..), i.loc_range(&'i'..=&'s'));
+        assert_eq!(i.loc_range(..&'c'), i.iloc_range(..7));
+        assert_eq!(i.loc_range(..=&'c'), i.iloc_range(..=7));
+        assert_eq!(i.loc_range(&'h'..), i.iloc_range(2..));
 
-        let i = Index::from_iter((1..=9).map(|i| i * 10));
+        assert_eq!(i.loc_range(..), i.loc_range(&'j'..=&'a'));
+        assert_eq!(i.loc_range(..&'c'), i.loc_range(&'j'..&'c'));
+        assert_eq!(i.loc_range(..=&'c'), i.loc_range(&'j'..=&'c'));
+        assert_eq!(i.loc_range(&'h'..), i.loc_range(&'h'..=&'a'));
 
-        assert_eq!(i.loc_range(&20..&60), Some(vec![1, 2, 3, 4]));
-        assert_eq!(i.loc_range(&20..=&60), Some(vec![1, 2, 3, 4, 5]));
-        assert_eq!(i.loc_range(&30..), Some(vec![2, 3, 4, 5, 6, 7, 8]));
-        assert_eq!(i.loc_range(..&70), Some(vec![0, 1, 2, 3, 4, 5]));
-        assert_eq!(i.loc_range(..=&70), Some(vec![0, 1, 2, 3, 4, 5, 6]));
-        assert_eq!(i.loc_range(..), Some(vec![0, 1, 2, 3, 4, 5, 6, 7, 8]));
-        assert_eq!(i.loc_range(&50..&50), Some(vec![]));
-        assert_eq!(i.loc_range(&50..=&50), Some(vec![4]));
-        assert_eq!(i.loc_range(&60..&40), Some(vec![]));
-        assert_eq!(i.loc_range(&60..=&40), Some(vec![]));
-        assert_eq!(i.loc_range(&10..&99), None);
-        assert_eq!(i.loc_range(&10..=&99), None);
-        assert_eq!(i.loc_range(&99..&10), None);
-        assert_eq!(i.loc_range(&99..=&10), None);
-        assert_eq!(i.loc_range(..&99), None);
-        assert_eq!(i.loc_range(..=&99), None);
-        assert_eq!(i.loc_range(&99..), None);
-
-        let i = Index::from_vec(vec![
-            String::from("Numi"),
-            String::from("Kova"),
-            String::from("Dutchess"),
-            String::from("Keya"),
-            String::from("Chibi"),
-            String::from("Toby"),
+        let i: Index<std::string::String> = Index::from_vec(vec![
+            String::from("ab"),
+            String::from("cd"),
+            String::from("ef"),
+            String::from("gh"),
+            String::from("ij"),
+            String::from("kl"),
+            String::from("mn"),
+            String::from("op"),
+            String::from("qr"),
+            String::from("st"),
         ]);
 
-        let out = i.loc_range("Kova".."Chibi");
-        assert_eq!(Some(vec![1, 2, 3]), out);
+        assert_eq!(i.loc_range("ef".."op"), Some(vec![2, 3, 4, 5, 6]));
+        assert_eq!(i.loc_range("ef"..="op"), Some(vec![2, 3, 4, 5, 6, 7]));
+        assert_eq!(i.loc_range("ef"..), Some(vec![2, 3, 4, 5, 6, 7, 8, 9]));
+        assert_eq!(i.loc_range(.."op"), Some(vec![0, 1, 2, 3, 4, 5, 6]));
+        assert_eq!(i.loc_range(..="op"), Some(vec![0, 1, 2, 3, 4, 5, 6, 7]));
+        assert_eq!(i.loc_range::<_, str>(..), Some(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]));
+        assert_eq!(i.loc_range("ij".."kl"), Some(vec![4]));
+        assert_eq!(i.loc_range("ij"..="kl"), Some(vec![4, 5]));
+        assert_eq!(i.loc_range("ij".."ij"), Some(vec![]));
+        assert_eq!(i.loc_range("ij"..="ij"), Some(vec![4]));
+        assert_eq!(i.loc_range("mn".."gh"), Some(vec![]));
+        assert_eq!(i.loc_range("mn"..="gh"), Some(vec![]));
+        assert_eq!(i.loc_range("kl".."ij"), Some(vec![]));
+        assert_eq!(i.loc_range("kl"..="ij"), Some(vec![]));
+        assert_eq!(i.loc_range("ab".."???"), None);
+        assert_eq!(i.loc_range("ab"..="???"), None);
+        assert_eq!(i.loc_range("???".."ab"), None);
+        assert_eq!(i.loc_range("???"..="ab"), None);
+        assert_eq!(i.loc_range(.."???"), None);
+        assert_eq!(i.loc_range(..="???"), None);
+        assert_eq!(i.loc_range("???"..), None);
+
+        assert_eq!(i.loc_range::<_, str>(..), i.iloc_range(0..i.len()));
+        assert_eq!(i.loc_range(.."op"), i.iloc_range(..7));
+        assert_eq!(i.loc_range(..="op"), i.iloc_range(..=7));
+        assert_eq!(i.loc_range("ef"..), i.iloc_range(2..));
+
+        assert_eq!(i.loc_range::<_, str>(..), i.loc_range("ab"..="st"));
+        assert_eq!(i.loc_range(.."op"), i.loc_range("ab".."op"));
+        assert_eq!(i.loc_range(..="op"), i.loc_range("ab"..="op"));
+        assert_eq!(i.loc_range("ef"..), i.loc_range("ef"..="st"));
     }
 }
