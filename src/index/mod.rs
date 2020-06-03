@@ -115,9 +115,7 @@ impl<L: Label> Index<L> {
     where
         R: RangeBounds<usize>,
     {
-        // TODO: ALWAYS VALIDATE BOUNDS, EVEN IF RANGE WOULD BE EMPTY.
-        // TODO: When `rust: range_is_empty #48111` is stabilized,
-        //       use that as a short circuit.
+        // NOTE: Range bounds are always validated, even if range would be empty.
         let start_idx = match range.start_bound() {
             Bound::Included(idx) => Some(*idx).filter(|x| x < &self.len())?,
             Bound::Excluded(idx) => Some(*idx).filter(|x| x <= &self.len())? + 1,
@@ -151,12 +149,12 @@ impl<L: Label> Index<L> {
         }
     }
 
-    pub fn loc<Q>(&self, loc: &Q) -> Option<usize>
+    pub fn loc<Q>(&self, lbl: &Q) -> Option<usize>
     where
         L: Borrow<Q>,
         Q: Hash + Eq + ?Sized,
     {
-        self.0.get_full(loc).map(|(idx, _)| idx)
+        self.0.get_full(lbl).map(|(idx, _)| idx)
     }
 
     pub fn loc_multi<'a, I, Q: 'a>(&self, lbls: I) -> Option<Vec<usize>>
