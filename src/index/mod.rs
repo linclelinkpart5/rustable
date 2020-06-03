@@ -157,11 +157,11 @@ impl<L: Label> Index<L> {
         self.0.get_full(lbl).map(|(idx, _)| idx)
     }
 
-    pub fn loc_multi<'a, I, Q: 'a>(&self, lbls: I) -> Option<Vec<usize>>
+    pub fn loc_multi<'a, I, Q>(&self, lbls: I) -> Option<Vec<usize>>
     where
         I: IntoIterator<Item = &'a Q>,
         L: Borrow<Q>,
-        Q: Hash + Eq + ?Sized,
+        Q: 'a + Hash + Eq + ?Sized,
     {
         lbls.into_iter().map(|lbl| self.loc(lbl)).collect::<Option<Vec<_>>>()
     }
@@ -210,11 +210,11 @@ trait LocRange<R> {
     fn loc_range(&self, range: R) -> Option<Vec<usize>>;
 }
 
-fn generic_loc_range_impl<'a, R, L, Q: 'a>(index: &Index<L>, range: R) -> Option<Vec<usize>>
+fn generic_loc_range_impl<'a, R, L, Q>(index: &Index<L>, range: R) -> Option<Vec<usize>>
     where
         R: RangeBounds<&'a Q>,
         L: Borrow<Q> + Label,
-        Q: Hash + Eq + ?Sized,
+        Q: 'a + Hash + Eq + ?Sized,
 {
     let start_idx = match range.start_bound() {
         Bound::Included(lbl) => index.loc(lbl)?,
