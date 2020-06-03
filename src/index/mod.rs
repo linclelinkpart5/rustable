@@ -100,15 +100,17 @@ impl<L: Label> Index<L> {
         self.0.sort_by(compare)
     }
 
-    pub fn iloc(&self, idx: usize) -> Option<usize> {
-        if idx < self.0.len() { Some(idx) } else { None }
+    pub fn iloc(&self, idx: &usize) -> Option<usize> {
+        if idx < &self.0.len() { Some(*idx) } else { None }
     }
 
-    pub fn iloc_multi<I>(&self, idxs: I) -> Option<Vec<usize>>
+    pub fn iloc_multi<'a, I>(&'a self, idxs: I) -> Option<Vec<usize>>
     where
-        I: IntoIterator<Item = usize>,
+        I: IntoIterator<Item = &'a usize>,
     {
-        idxs.into_iter().map(|idx| self.iloc(idx)).collect::<Option<Vec<_>>>()
+        let mut res = Vec::new();
+        for idx in idxs { res.push(self.iloc(idx)?); }
+        Some(res)
     }
 
     pub fn iloc_range<R>(&self, range: R) -> Option<Vec<usize>>
@@ -128,7 +130,9 @@ impl<L: Label> Index<L> {
             Bound::Unbounded => self.len(),
         };
 
-        self.iloc_multi(start_idx..close_idx)
+        let mut res = Vec::new();
+        for idx in start_idx..close_idx { res.push(self.iloc(&idx)?); }
+        Some(res)
     }
 
     pub fn bloc<A>(&self, bools: A) -> Option<Vec<usize>>
@@ -228,7 +232,9 @@ fn generic_loc_range_impl<'a, R, L, Q>(index: &Index<L>, range: R) -> Option<Vec
         Bound::Unbounded => index.len(),
     };
 
-    index.iloc_multi(start_idx..close_idx)
+    let mut res = Vec::new();
+    for idx in start_idx..close_idx { res.push(index.iloc(&idx)?); }
+    Some(res)
 }
 
 impl<L> LocRange<RangeFull> for Index<L>
@@ -295,20 +301,83 @@ mod tests {
     use super::*;
 
     #[test]
+    fn iloc() {
+        let i = Index::from_iter("ideographs".chars());
+
+        assert_eq!(i.iloc(&0), Some(0));
+        assert_eq!(i.iloc(&1), Some(1));
+        assert_eq!(i.iloc(&2), Some(2));
+        assert_eq!(i.iloc(&3), Some(3));
+        assert_eq!(i.iloc(&4), Some(4));
+        assert_eq!(i.iloc(&5), Some(5));
+        assert_eq!(i.iloc(&6), Some(6));
+        assert_eq!(i.iloc(&7), Some(7));
+        assert_eq!(i.iloc(&8), Some(8));
+        assert_eq!(i.iloc(&9), Some(9));
+        assert_eq!(i.iloc(&42), None);
+    }
+
+    #[test]
+    fn iloc_multi() {
+        let i = Index::from_slice(&[10u32, 20, 30, 40, 50]);
+
+        assert_eq!(i.iloc_multi(&[]), Some(vec![]));
+        assert_eq!(i.iloc_multi(&[2]), Some(vec![2]));
+        assert_eq!(i.iloc_multi(&[0, 1, 2, 3]), Some(vec![0, 1, 2, 3]));
+        assert_eq!(i.iloc_multi(&[4, 3, 2, 1]), Some(vec![4, 3, 2, 1]));
+        assert_eq!(i.iloc_multi(&[9]), None);
+        assert_eq!(i.iloc_multi(&[9, 1, 2, 3, 4]), None);
+        assert_eq!(i.iloc_multi(&[0, 1, 2, 3, 9]), None);
+    }
+
+    #[test]
+    fn iloc_range() {
+        let i = Index::from_iter("jihgfedcba".chars());
+
+        assert_eq!(i.iloc_range(&2..&7), Some(vec![2, 3, 4, 5, 6]));
+        assert_eq!(i.iloc_range(&2..=&7), Some(vec![2, 3, 4, 5, 6, 7]));
+        assert_eq!(i.iloc_range(&2..), Some(vec![2, 3, 4, 5, 6, 7, 8, 9]));
+        assert_eq!(i.iloc_range(..&7), Some(vec![0, 1, 2, 3, 4, 5, 6]));
+        assert_eq!(i.iloc_range(..=&7), Some(vec![0, 1, 2, 3, 4, 5, 6, 7]));
+        assert_eq!(i.iloc_range(..), Some(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]));
+        assert_eq!(i.iloc_range(&4..&5), Some(vec![4]));
+        assert_eq!(i.iloc_range(&4..=&5), Some(vec![4, 5]));
+        assert_eq!(i.iloc_range(&4..&4), Some(vec![]));
+        assert_eq!(i.iloc_range(&4..=&4), Some(vec![4]));
+        assert_eq!(i.iloc_range(&6..&3), Some(vec![]));
+        assert_eq!(i.iloc_range(&6..=&3), Some(vec![]));
+        assert_eq!(i.iloc_range(&5..&4), Some(vec![]));
+        assert_eq!(i.iloc_range(&5..=&4), Some(vec![]));
+        assert_eq!(i.iloc_range(&0..&42), None);
+        assert_eq!(i.iloc_range(&0..=&42), None);
+        assert_eq!(i.iloc_range(&42..&9), None);
+        assert_eq!(i.iloc_range(&42..=&9), None);
+        assert_eq!(i.iloc_range(..&42), None);
+        assert_eq!(i.iloc_range(..=&42), None);
+        assert_eq!(i.iloc_range(&42..), None);
+
+        assert_eq!(i.iloc_range(..), i.iloc_range(&0..&i.len()));
+        assert_eq!(i.iloc_range(..), i.iloc_range(&0..=&9));
+        assert_eq!(i.iloc_range(..&7), i.iloc_range(&0..&7));
+        assert_eq!(i.iloc_range(..=&7), i.iloc_range(&0..=&7));
+        assert_eq!(i.iloc_range(&2..), i.iloc_range(&2..=&9));
+    }
+
+    #[test]
     fn loc() {
         let i = Index::from_iter("ideographs".chars());
 
-        assert_eq!(Some(0), i.loc(&'i'));
-        assert_eq!(Some(1), i.loc(&'d'));
-        assert_eq!(Some(2), i.loc(&'e'));
-        assert_eq!(Some(3), i.loc(&'o'));
-        assert_eq!(Some(4), i.loc(&'g'));
-        assert_eq!(Some(5), i.loc(&'r'));
-        assert_eq!(Some(6), i.loc(&'a'));
-        assert_eq!(Some(7), i.loc(&'p'));
-        assert_eq!(Some(8), i.loc(&'h'));
-        assert_eq!(Some(9), i.loc(&'s'));
-        assert_eq!(None, i.loc(&'x'));
+        assert_eq!(i.loc(&'i'), Some(0));
+        assert_eq!(i.loc(&'d'), Some(1));
+        assert_eq!(i.loc(&'e'), Some(2));
+        assert_eq!(i.loc(&'o'), Some(3));
+        assert_eq!(i.loc(&'g'), Some(4));
+        assert_eq!(i.loc(&'r'), Some(5));
+        assert_eq!(i.loc(&'a'), Some(6));
+        assert_eq!(i.loc(&'p'), Some(7));
+        assert_eq!(i.loc(&'h'), Some(8));
+        assert_eq!(i.loc(&'s'), Some(9));
+        assert_eq!(i.loc(&'x'), None);
     }
 
     #[test]
