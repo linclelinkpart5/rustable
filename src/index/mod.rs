@@ -161,27 +161,6 @@ impl<L: Label> Index<L> {
     {
         lbls.into_iter().map(|lbl| self.loc(lbl)).collect::<Option<Vec<_>>>()
     }
-
-    pub fn loc_range<'a, R, Q: 'a>(&self, range: R) -> Option<Vec<usize>>
-    where
-        R: RangeBounds<&'a Q>,
-        L: Borrow<Q>,
-        Q: Hash + Eq + ?Sized,
-    {
-        let start_idx = match range.start_bound() {
-            Bound::Included(lbl) => self.loc(lbl)?,
-            Bound::Excluded(lbl) => self.loc(lbl)? + 1,
-            Bound::Unbounded => 0,
-        };
-
-        let close_idx = match range.end_bound() {
-            Bound::Included(lbl) => self.loc(lbl)? + 1,
-            Bound::Excluded(lbl) => self.loc(lbl)?,
-            Bound::Unbounded => self.len(),
-        };
-
-        self.iloc_multi(start_idx..close_idx)
-    }
 }
 
 // Handles loading from `&[0u32, 1, 2]`.
@@ -219,6 +198,135 @@ impl<L: Label> IntoIterator for Index<L> {
 
     fn into_iter(self) -> Self::IntoIter {
         IntoIter(self.0.into_iter())
+    }
+}
+
+
+pub trait LocRange<R> {
+    fn loc_range(&self, range: R) -> Option<Vec<usize>>;
+}
+
+fn generic_loc_range_impl<'a, R, L, Q: 'a>(index: &Index<L>, range: R) -> Option<Vec<usize>>
+    where
+        R: RangeBounds<&'a Q>,
+        L: Borrow<Q> + Label,
+        Q: Hash + Eq + ?Sized,
+{
+    let start_idx = match range.start_bound() {
+        Bound::Included(lbl) => index.loc(lbl)?,
+        Bound::Excluded(lbl) => index.loc(lbl)? + 1,
+        Bound::Unbounded => 0,
+    };
+
+    let close_idx = match range.end_bound() {
+        Bound::Included(lbl) => index.loc(lbl)? + 1,
+        Bound::Excluded(lbl) => index.loc(lbl)?,
+        Bound::Unbounded => index.len(),
+    };
+
+    index.iloc_multi(start_idx..close_idx)
+}
+
+use std::ops::Range;
+use std::ops::RangeFrom;
+use std::ops::RangeTo;
+use std::ops::RangeInclusive;
+use std::ops::RangeToInclusive;
+use std::ops::RangeFull;
+
+impl<L> LocRange<RangeFull> for Index<L>
+where
+    L: Label,
+{
+    fn loc_range(&self, _range: RangeFull) -> Option<Vec<usize>> {
+        generic_loc_range_impl::<RangeFull, L, L>(self, ..)
+    }
+}
+
+impl<'a, L, Q> LocRange<Range<&'a Q>> for Index<L>
+where
+    L: Label + Borrow<Q>,
+    Q: 'a + Hash + Eq + ?Sized,
+{
+    fn loc_range(&self, range: Range<&'a Q>) -> Option<Vec<usize>> {
+        generic_loc_range_impl(self, range)
+    }
+}
+
+impl<'a, L, Q> LocRange<RangeFrom<&'a Q>> for Index<L>
+where
+    L: Label + Borrow<Q>,
+    Q: 'a + Hash + Eq + ?Sized,
+{
+    fn loc_range(&self, range: RangeFrom<&'a Q>) -> Option<Vec<usize>> {
+        generic_loc_range_impl(self, range)
+    }
+}
+
+impl<'a, L, Q> LocRange<RangeTo<&'a Q>> for Index<L>
+where
+    L: Label + Borrow<Q>,
+    Q: 'a + Hash + Eq + ?Sized,
+{
+    fn loc_range(&self, range: RangeTo<&'a Q>) -> Option<Vec<usize>> {
+        generic_loc_range_impl(self, range)
+    }
+}
+
+impl<'a, L, Q> LocRange<RangeToInclusive<&'a Q>> for Index<L>
+where
+    L: Label + Borrow<Q>,
+    Q: 'a + Hash + Eq + ?Sized,
+{
+    fn loc_range(&self, range: RangeToInclusive<&'a Q>) -> Option<Vec<usize>> {
+        generic_loc_range_impl(self, range)
+    }
+}
+
+impl<'a, L, Q> LocRange<RangeInclusive<&'a Q>> for Index<L>
+where
+    L: Label + Borrow<Q>,
+    Q: 'a + Hash + Eq + ?Sized,
+{
+    fn loc_range(&self, range: RangeInclusive<&'a Q>) -> Option<Vec<usize>> {
+        generic_loc_range_impl(self, range)
+    }
+}
+
+impl<L: Label> Index<L> {
+    pub fn loc_range<R>(&self, range: R) -> Option<Vec<usize>>
+    where
+        Self: LocRange<R>
+    {
+        LocRange::loc_range(self, range)
+    }
+
+    pub fn test() {
+        let i = Index::from_vec(vec!['a', 'b', 'c']);
+
+        // OK!
+        println!("{:?}", i.loc_range(&'a'..&'c'));
+        // println!("{:?}", i.loc_range(..&'c'));
+        // println!("{:?}", i.loc_range(&'a'..));
+        println!("{:?}", i.loc_range(..));
+
+        let i = Index::from_vec(vec![
+            String::from("a"),
+            String::from("b"),
+            String::from("c"),
+        ]);
+
+        // Strange that no '&' is needed, but compiles
+        println!("{:?}", i.loc_range("a".."c"));
+        // println!("{:?}", i.loc_range(.."c"));
+        // println!("{:?}", i.loc_range("a"..));
+
+        // ERROR E0283
+        // cannot resolve `std::string::String: std::borrow::Borrow<_>`
+        println!("{:?}", i.loc_range(..));
+
+        // Compiles, but feels very unergonomic!
+        println!("{:?}", i.loc_range(..));
     }
 }
 
@@ -310,7 +418,7 @@ mod tests {
         assert_eq!(i.loc_range("ef"..), Some(vec![2, 3, 4, 5, 6, 7, 8, 9]));
         assert_eq!(i.loc_range(.."op"), Some(vec![0, 1, 2, 3, 4, 5, 6]));
         assert_eq!(i.loc_range(..="op"), Some(vec![0, 1, 2, 3, 4, 5, 6, 7]));
-        assert_eq!(i.loc_range::<_, str>(..), Some(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]));
+        assert_eq!(i.loc_range(..), Some(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]));
         assert_eq!(i.loc_range("ij".."kl"), Some(vec![4]));
         assert_eq!(i.loc_range("ij"..="kl"), Some(vec![4, 5]));
         assert_eq!(i.loc_range("ij".."ij"), Some(vec![]));
@@ -327,12 +435,12 @@ mod tests {
         assert_eq!(i.loc_range(..="???"), None);
         assert_eq!(i.loc_range("???"..), None);
 
-        assert_eq!(i.loc_range::<_, str>(..), i.iloc_range(0..i.len()));
+        assert_eq!(i.loc_range(..), i.iloc_range(0..i.len()));
         assert_eq!(i.loc_range(.."op"), i.iloc_range(..7));
         assert_eq!(i.loc_range(..="op"), i.iloc_range(..=7));
         assert_eq!(i.loc_range("ef"..), i.iloc_range(2..));
 
-        assert_eq!(i.loc_range::<_, str>(..), i.loc_range("ab"..="st"));
+        assert_eq!(i.loc_range(..), i.loc_range("ab"..="st"));
         assert_eq!(i.loc_range(.."op"), i.loc_range("ab".."op"));
         assert_eq!(i.loc_range(..="op"), i.loc_range("ab"..="op"));
         assert_eq!(i.loc_range("ef"..), i.loc_range("ef"..="st"));
