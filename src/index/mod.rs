@@ -7,6 +7,12 @@ use std::hash::Hash;
 use std::iter::FromIterator;
 use std::ops::Bound;
 use std::ops::RangeBounds;
+use std::ops::Range;
+use std::ops::RangeFrom;
+use std::ops::RangeTo;
+use std::ops::RangeInclusive;
+use std::ops::RangeToInclusive;
+use std::ops::RangeFull;
 
 use indexmap::IndexSet;
 
@@ -201,8 +207,8 @@ impl<L: Label> IntoIterator for Index<L> {
     }
 }
 
-
-pub trait LocRange<R> {
+/// Trait to help abstract over the differences among range types.
+trait LocRange<R> {
     fn loc_range(&self, range: R) -> Option<Vec<usize>>;
 }
 
@@ -226,13 +232,6 @@ fn generic_loc_range_impl<'a, R, L, Q: 'a>(index: &Index<L>, range: R) -> Option
 
     index.iloc_multi(start_idx..close_idx)
 }
-
-use std::ops::Range;
-use std::ops::RangeFrom;
-use std::ops::RangeTo;
-use std::ops::RangeInclusive;
-use std::ops::RangeToInclusive;
-use std::ops::RangeFull;
 
 impl<L> LocRange<RangeFull> for Index<L>
 where
@@ -290,43 +289,6 @@ where
 {
     fn loc_range(&self, range: RangeInclusive<&'a Q>) -> Option<Vec<usize>> {
         generic_loc_range_impl(self, range)
-    }
-}
-
-impl<L: Label> Index<L> {
-    pub fn loc_range<R>(&self, range: R) -> Option<Vec<usize>>
-    where
-        Self: LocRange<R>
-    {
-        LocRange::loc_range(self, range)
-    }
-
-    pub fn test() {
-        let i = Index::from_vec(vec!['a', 'b', 'c']);
-
-        // OK!
-        println!("{:?}", i.loc_range(&'a'..&'c'));
-        // println!("{:?}", i.loc_range(..&'c'));
-        // println!("{:?}", i.loc_range(&'a'..));
-        println!("{:?}", i.loc_range(..));
-
-        let i = Index::from_vec(vec![
-            String::from("a"),
-            String::from("b"),
-            String::from("c"),
-        ]);
-
-        // Strange that no '&' is needed, but compiles
-        println!("{:?}", i.loc_range("a".."c"));
-        // println!("{:?}", i.loc_range(.."c"));
-        // println!("{:?}", i.loc_range("a"..));
-
-        // ERROR E0283
-        // cannot resolve `std::string::String: std::borrow::Borrow<_>`
-        println!("{:?}", i.loc_range(..));
-
-        // Compiles, but feels very unergonomic!
-        println!("{:?}", i.loc_range(..));
     }
 }
 
