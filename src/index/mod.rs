@@ -113,20 +113,20 @@ impl<L: Label> Index<L> {
         Some(res)
     }
 
-    pub fn iloc_range<R>(&self, range: R) -> Option<Vec<usize>>
+    pub fn iloc_range<'a, R>(&'a self, range: R) -> Option<Vec<usize>>
     where
-        R: RangeBounds<usize>,
+        R: RangeBounds<&'a usize>,
     {
         // NOTE: Range bounds are always validated, even if range would be empty.
         let start_idx = match range.start_bound() {
-            Bound::Included(idx) => Some(*idx).filter(|x| x < &self.len())?,
-            Bound::Excluded(idx) => Some(*idx).filter(|x| x <= &self.len())? + 1,
+            Bound::Included(&idx) => Some(idx).filter(|&i| i < &self.len()).copied()?,
+            Bound::Excluded(&idx) => Some(idx).filter(|&i| i <= &self.len()).copied()? + 1,
             Bound::Unbounded => 0,
         };
 
         let close_idx = match range.end_bound() {
-            Bound::Included(idx) => Some(*idx).filter(|x| x < &self.len())? + 1,
-            Bound::Excluded(idx) => Some(*idx).filter(|x| x <= &self.len())?,
+            Bound::Included(&idx) => Some(idx).filter(|&i| i < &self.len()).copied()? + 1,
+            Bound::Excluded(&idx) => Some(idx).filter(|&i| i <= &self.len()).copied()?,
             Bound::Unbounded => self.len(),
         };
 
@@ -232,9 +232,7 @@ fn generic_loc_range_impl<'a, R, L, Q>(index: &Index<L>, range: R) -> Option<Vec
         Bound::Unbounded => index.len(),
     };
 
-    let mut res = Vec::new();
-    for idx in start_idx..close_idx { res.push(index.iloc(&idx)?); }
-    Some(res)
+    index.iloc_range(&start_idx..&close_idx)
 }
 
 impl<L> LocRange<RangeFull> for Index<L>
@@ -419,10 +417,10 @@ mod tests {
         assert_eq!(i.loc_range(..=&'x'), None);
         assert_eq!(i.loc_range(&'x'..), None);
 
-        assert_eq!(i.loc_range(..), i.iloc_range(0..i.len()));
-        assert_eq!(i.loc_range(..&'c'), i.iloc_range(..7));
-        assert_eq!(i.loc_range(..=&'c'), i.iloc_range(..=7));
-        assert_eq!(i.loc_range(&'h'..), i.iloc_range(2..));
+        assert_eq!(i.loc_range(..), i.iloc_range(&0..&i.len()));
+        assert_eq!(i.loc_range(..&'c'), i.iloc_range(..&7));
+        assert_eq!(i.loc_range(..=&'c'), i.iloc_range(..=&7));
+        assert_eq!(i.loc_range(&'h'..), i.iloc_range(&2..));
 
         assert_eq!(i.loc_range(..), i.loc_range(&'j'..=&'a'));
         assert_eq!(i.loc_range(..&'c'), i.loc_range(&'j'..&'c'));
@@ -464,10 +462,10 @@ mod tests {
         assert_eq!(i.loc_range(..="???"), None);
         assert_eq!(i.loc_range("???"..), None);
 
-        assert_eq!(i.loc_range(..), i.iloc_range(0..i.len()));
-        assert_eq!(i.loc_range(.."op"), i.iloc_range(..7));
-        assert_eq!(i.loc_range(..="op"), i.iloc_range(..=7));
-        assert_eq!(i.loc_range("ef"..), i.iloc_range(2..));
+        assert_eq!(i.loc_range(..), i.iloc_range(&0..&i.len()));
+        assert_eq!(i.loc_range(.."op"), i.iloc_range(..&7));
+        assert_eq!(i.loc_range(..="op"), i.iloc_range(..=&7));
+        assert_eq!(i.loc_range("ef"..), i.iloc_range(&2..));
 
         assert_eq!(i.loc_range(..), i.loc_range("ab"..="st"));
         assert_eq!(i.loc_range(.."op"), i.loc_range("ab".."op"));
