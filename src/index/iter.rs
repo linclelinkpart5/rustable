@@ -4,6 +4,7 @@
 use std::borrow::Borrow;
 use std::hash::Hash;
 use std::iter::Chain;
+use std::ops::Range;
 
 use crate::traits::Label;
 
@@ -234,6 +235,58 @@ where
     }
 }
 
+/// A lazy iterator that yields indices from a iloc range expression.
+pub struct ILocRange<'a, L>(Range<usize>, &'a Index<L>)
+where
+    L: Label,
+;
+
+impl<'a, L> ILocRange<'a, L>
+where
+    L: Label,
+{
+    // NOTE: Want to intentionally keep a ref to the index, even though the
+    //       bounds are independent, otherwise cohesion is lost.
+    pub(crate) fn new(range: Range<usize>, index: &'a Index<L>) -> Self {
+        Self(range, index)
+    }
+}
+
+impl<'a, L> Iterator for ILocRange<'a, L>
+where
+    L: Label,
+{
+    type Item = usize;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let idx = self.0.next()?;
+        Some(self.1.iloc(&idx).unwrap())
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
+    }
+}
+
+impl<'a, L> DoubleEndedIterator for ILocRange<'a, L>
+where
+    L: Label,
+{
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let idx = self.0.next_back()?;
+        Some(self.1.iloc(&idx).unwrap())
+    }
+}
+
+impl<'a, L> ExactSizeIterator for ILocRange<'a, L>
+where
+    L: Label,
+{
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
 /// A lazy iterator that yields indices from multiple loc indices.
 pub struct LocMulti<'a, I, L, Q>(I, &'a Index<L>)
 where
@@ -287,6 +340,54 @@ where
     I: Iterator<Item = &'a Q> + ExactSizeIterator,
     L: Label + Borrow<Q>,
     Q: Hash + Eq,
+{
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+/// A lazy iterator that yields indices from a loc range expression.
+pub struct LocRange<'a, L>(ILocRange<'a, L>)
+where
+    L: Label,
+;
+
+impl<'a, L> LocRange<'a, L>
+where
+    L: Label,
+{
+    pub(crate) fn new(iloc_range: ILocRange<'a, L>) -> Self {
+        Self(iloc_range)
+    }
+}
+
+impl<'a, L> Iterator for LocRange<'a, L>
+where
+    L: Label,
+{
+    type Item = usize;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
+    }
+}
+
+impl<'a, L> DoubleEndedIterator for LocRange<'a, L>
+where
+    L: Label,
+{
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.0.next_back()
+    }
+}
+
+impl<'a, L> ExactSizeIterator for LocRange<'a, L>
+where
+    L: Label,
 {
     fn len(&self) -> usize {
         self.0.len()
