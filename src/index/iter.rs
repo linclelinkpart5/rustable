@@ -247,8 +247,9 @@ where
 {
     // NOTE: Want to intentionally keep a ref to the index, even though the
     //       bounds are independent, otherwise cohesion is lost.
-    pub(crate) fn new(range: Range<usize>, index: &'a Index<L>) -> Self {
-        Self(range, index)
+    pub(crate) fn new(range: Range<usize>, index: &'a Index<L>) -> Option<Self> {
+        if range.start > index.len() || range.end > index.len() { None }
+        else { Some(Self(range, index)) }
     }
 }
 
@@ -259,8 +260,7 @@ where
     type Item = usize;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let idx = self.0.next()?;
-        Some(self.1.iloc(&idx).unwrap())
+        self.0.next()
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -273,8 +273,7 @@ where
     L: Label,
 {
     fn next_back(&mut self) -> Option<Self::Item> {
-        let idx = self.0.next_back()?;
-        Some(self.1.iloc(&idx).unwrap())
+        self.0.next_back()
     }
 }
 
@@ -356,8 +355,15 @@ impl<'a, L> LocRange<'a, L>
 where
     L: Label,
 {
-    pub(crate) fn new(iloc_range: ILocRange<'a, L>) -> Self {
-        Self(iloc_range)
+    pub(crate) fn new<Q>(a_lbl: &'a Q, b_lbl: &'a Q, index: &'a Index<L>) -> Option<Self>
+    where
+        L: Borrow<Q>,
+        Q: 'a + Hash + Eq,
+    {
+        // This returns the range from the first to the second label, inclusive.
+        let start_idx = index.loc(a_lbl)?;
+        let close_idx = index.loc(b_lbl).and_then(|i| i.checked_add(1))?;
+        ILocRange::new(start_idx..close_idx, index).map(Self)
     }
 }
 
