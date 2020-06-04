@@ -1,6 +1,8 @@
 
 //! Iterators for use with `Index`.
 
+use std::borrow::Borrow;
+use std::hash::Hash;
 use std::iter::Chain;
 
 use crate::traits::Label;
@@ -172,5 +174,121 @@ impl<'a, L: Label> Iterator for Union<'a, L> {
 impl<'a, L: Label> DoubleEndedIterator for Union<'a, L> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.0.next_back()
+    }
+}
+
+/// A lazy iterator that yields indices from multiple iloc indices.
+pub struct ILocMulti<'a, I, L>(I, &'a Index<L>)
+where
+    I: Iterator<Item = &'a usize>,
+    L: Label,
+;
+
+impl<'a, I, L> ILocMulti<'a, I, L>
+where
+    I: Iterator<Item = &'a usize>,
+    L: Label,
+{
+    // NOTE: Want to intentionally keep a ref to the index, not just the size,
+    //       otherwise cohesion is lost.
+    pub(crate) fn new(iter: I, index: &'a Index<L>) -> Self {
+        Self(iter, index)
+    }
+}
+
+impl<'a, I, L> Iterator for ILocMulti<'a, I, L>
+where
+    I: Iterator<Item = &'a usize>,
+    L: Label,
+{
+    type Item = Option<usize>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let idx = self.0.next()?;
+        Some(self.1.iloc(idx))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
+    }
+}
+
+impl<'a, I, L> DoubleEndedIterator for ILocMulti<'a, I, L>
+where
+    I: Iterator<Item = &'a usize> + DoubleEndedIterator,
+    L: Label,
+{
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let idx = self.0.next_back()?;
+        Some(self.1.iloc(idx))
+    }
+}
+
+impl<'a, I, L> ExactSizeIterator for ILocMulti<'a, I, L>
+where
+    I: Iterator<Item = &'a usize> + ExactSizeIterator,
+    L: Label,
+{
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+/// A lazy iterator that yields indices from multiple loc indices.
+pub struct LocMulti<'a, I, L, Q>(I, &'a Index<L>)
+where
+    I: Iterator<Item = &'a Q>,
+    L: Label + Borrow<Q>,
+    Q: 'a + Hash + Eq;
+
+impl<'a, I, L, Q> LocMulti<'a, I, L, Q>
+where
+    I: Iterator<Item = &'a Q>,
+    L: Label + Borrow<Q>,
+    Q: 'a + Hash + Eq,
+{
+    pub(crate) fn new(iter: I, index: &'a Index<L>) -> Self {
+        Self(iter, index)
+    }
+}
+
+impl<'a, I, L, Q> Iterator for LocMulti<'a, I, L, Q>
+where
+    I: Iterator<Item = &'a Q>,
+    L: Label + Borrow<Q>,
+    Q: Hash + Eq,
+{
+    type Item = Option<usize>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let lbl = self.0.next()?;
+        Some(self.1.loc(lbl))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
+    }
+}
+
+impl<'a, I, L, Q> DoubleEndedIterator for LocMulti<'a, I, L, Q>
+where
+    I: Iterator<Item = &'a Q> + DoubleEndedIterator,
+    L: Label + Borrow<Q>,
+    Q: Hash + Eq,
+{
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let lbl = self.0.next_back()?;
+        Some(self.1.loc(lbl))
+    }
+}
+
+impl<'a, I, L, Q> ExactSizeIterator for LocMulti<'a, I, L, Q>
+where
+    I: Iterator<Item = &'a Q> + ExactSizeIterator,
+    L: Label + Borrow<Q>,
+    Q: Hash + Eq,
+{
+    fn len(&self) -> usize {
+        self.0.len()
     }
 }
