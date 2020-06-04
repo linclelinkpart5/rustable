@@ -158,7 +158,7 @@ impl<L: Label> Index<L> {
         L: Borrow<Q>,
         Q: Hash + Eq + ?Sized,
     {
-        self.0.get_full(lbl).map(|(idx, _)| idx)
+        self.0.get_index_of(lbl)
     }
 
     pub fn loc_multi<'a, I, Q>(&self, lbls: I) -> Option<Vec<usize>>
