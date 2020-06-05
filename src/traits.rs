@@ -15,7 +15,7 @@ pub trait Storable: Debug + Clone + Send + Sized {
 /// Trait that defines what is needed for a label in an `Index`.
 pub trait Label: Storable + PartialEq + Eq + Hash + PartialOrd + Ord {}
 
-impl<T: Storable + Eq + Hash + Ord> Label for T {}
+impl<T: Storable + PartialEq + Eq + Hash + PartialOrd + Ord> Label for T {}
 
 /// Defines types that support lookup via a single iloc.
 pub trait ILocable {
@@ -98,12 +98,13 @@ where
 /// Defines types that support lookup via a fixed sequence of booleans.
 /// The input sequence of booleans shoud have the same dimensions as the
 /// implementing type. If not, this should return `None`.
-pub trait BLocable<A>
+pub trait BLocable<'a, I>
 where
-    A: AsRef<[bool]>,
+    I: IntoIterator<Item = &'a bool>,
+    I::IntoIter: ExactSizeIterator,
 {
     type Item;
     type Iter: Iterator<Item = Self::Item>;
 
-    fn bloc(&self, selectors: &A) -> Option<Self::Iter>;
+    fn bloc(&self, selectors: I) -> Option<Self::Iter>;
 }
