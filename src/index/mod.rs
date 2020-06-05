@@ -25,6 +25,8 @@ use self::iter::Diff;
 use self::iter::SymDiff;
 use self::iter::Inter;
 use self::iter::Union;
+use self::iter::ILocMulti;
+use self::iter::ILocRange;
 
 #[derive(Debug, Clone)]
 pub struct Index<L: Label>(IndexSet<L>);
@@ -113,6 +115,13 @@ impl<L: Label> Index<L> {
         Some(res)
     }
 
+    pub fn iloc_multi_iter<'a, I>(&'a self, idxs: I) -> ILocMulti<'a, I::IntoIter, L>
+    where
+        I: IntoIterator<Item = &'a usize>,
+    {
+        ILocMulti::new(idxs.into_iter(), self)
+    }
+
     pub fn iloc_range<'a, R>(&'a self, range: R) -> Option<Vec<usize>>
     where
         R: RangeBounds<&'a usize>,
@@ -133,6 +142,26 @@ impl<L: Label> Index<L> {
         let mut res = Vec::new();
         for idx in start_idx..close_idx { res.push(self.iloc(&idx)?); }
         Some(res)
+    }
+
+    pub fn iloc_range_iter<'a, R>(&'a self, range: R) -> Option<ILocRange<'a, L>>
+    where
+        R: RangeBounds<&'a usize>,
+    {
+        // NOTE: Need these in order to convert `&usize` to `usize`.
+        let start_bound = match range.start_bound() {
+            Bound::Unbounded => Bound::Unbounded,
+            Bound::Included(x) => Bound::Included(*x),
+            Bound::Excluded(x) => Bound::Excluded(*x),
+        };
+
+        let close_bound = match range.end_bound() {
+            Bound::Unbounded => Bound::Unbounded,
+            Bound::Included(x) => Bound::Included(*x),
+            Bound::Excluded(x) => Bound::Excluded(*x),
+        };
+
+        ILocRange::new((start_bound, close_bound), self)
     }
 
     pub fn bloc<A>(&self, bools: A) -> Option<Vec<usize>>
@@ -210,7 +239,7 @@ impl<L: Label> IntoIterator for Index<L> {
 }
 
 /// Trait to help abstract over the differences among range types.
-trait LocRange<R> {
+trait TraitLocRange<R> {
     fn loc_range(&self, range: R) -> Option<Vec<usize>>;
 }
 
@@ -235,7 +264,7 @@ fn generic_loc_range_impl<'a, R, L, Q>(index: &Index<L>, range: R) -> Option<Vec
     index.iloc_range(&start_idx..&close_idx)
 }
 
-impl<L> LocRange<RangeFull> for Index<L>
+impl<L> TraitLocRange<RangeFull> for Index<L>
 where
     L: Label,
 {
@@ -244,7 +273,7 @@ where
     }
 }
 
-impl<'a, L, Q> LocRange<Range<&'a Q>> for Index<L>
+impl<'a, L, Q> TraitLocRange<Range<&'a Q>> for Index<L>
 where
     L: Label + Borrow<Q>,
     Q: 'a + Hash + Eq + ?Sized,
@@ -254,7 +283,7 @@ where
     }
 }
 
-impl<'a, L, Q> LocRange<RangeFrom<&'a Q>> for Index<L>
+impl<'a, L, Q> TraitLocRange<RangeFrom<&'a Q>> for Index<L>
 where
     L: Label + Borrow<Q>,
     Q: 'a + Hash + Eq + ?Sized,
@@ -264,7 +293,7 @@ where
     }
 }
 
-impl<'a, L, Q> LocRange<RangeTo<&'a Q>> for Index<L>
+impl<'a, L, Q> TraitLocRange<RangeTo<&'a Q>> for Index<L>
 where
     L: Label + Borrow<Q>,
     Q: 'a + Hash + Eq + ?Sized,
@@ -274,7 +303,7 @@ where
     }
 }
 
-impl<'a, L, Q> LocRange<RangeToInclusive<&'a Q>> for Index<L>
+impl<'a, L, Q> TraitLocRange<RangeToInclusive<&'a Q>> for Index<L>
 where
     L: Label + Borrow<Q>,
     Q: 'a + Hash + Eq + ?Sized,
@@ -284,7 +313,7 @@ where
     }
 }
 
-impl<'a, L, Q> LocRange<RangeInclusive<&'a Q>> for Index<L>
+impl<'a, L, Q> TraitLocRange<RangeInclusive<&'a Q>> for Index<L>
 where
     L: Label + Borrow<Q>,
     Q: 'a + Hash + Eq + ?Sized,

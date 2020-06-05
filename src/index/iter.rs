@@ -4,11 +4,39 @@
 use std::borrow::Borrow;
 use std::hash::Hash;
 use std::iter::Chain;
+use std::ops::Bound;
+use std::ops::RangeBounds;
 use std::ops::Range;
+use std::ops::RangeFrom;
+use std::ops::RangeTo;
+use std::ops::RangeInclusive;
+use std::ops::RangeToInclusive;
+use std::ops::RangeFull;
 
 use crate::traits::Label;
 
 use super::Index;
+
+fn range_conv<'a, R, L, Q>(index: &Index<L>, range: R) -> Option<Range<usize>>
+    where
+        R: RangeBounds<&'a Q>,
+        L: Borrow<Q> + Label,
+        Q: 'a + Hash + Eq + ?Sized,
+{
+    let start_idx = match range.start_bound() {
+        Bound::Included(lbl) => index.loc(lbl)?,
+        Bound::Excluded(lbl) => index.loc(lbl).and_then(|i| i.checked_add(1))?,
+        Bound::Unbounded => 0,
+    };
+
+    let close_idx = match range.end_bound() {
+        Bound::Included(lbl) => index.loc(lbl).and_then(|i| i.checked_add(1))?,
+        Bound::Excluded(lbl) => index.loc(lbl)?,
+        Bound::Unbounded => index.len(),
+    };
+
+    Some(start_idx..close_idx)
+}
 
 pub struct Iter<'a, L: Label>(pub(crate) indexmap::set::Iter<'a, L>);
 
@@ -247,9 +275,26 @@ where
 {
     // NOTE: Want to intentionally keep a ref to the index, even though the
     //       bounds are independent, otherwise cohesion is lost.
-    pub(crate) fn new(range: Range<usize>, index: &'a Index<L>) -> Option<Self> {
-        if range.start > index.len() || range.end > index.len() { None }
-        else { Some(Self(range, index)) }
+    //       Mutating the index while the iterator is active cannot be allowed.
+    pub(crate) fn new<R>(range: R, index: &'a Index<L>) -> Option<Self>
+    where
+        R: RangeBounds<usize>,
+    {
+        // NOTE: Range bounds are always validated,
+        //       even if the range would be empty.
+        let start_idx = match range.start_bound() {
+            Bound::Included(&idx) => idx,
+            Bound::Excluded(&idx) => idx.checked_add(1)?,
+            Bound::Unbounded => 0,
+        };
+
+        let close_idx = match range.end_bound() {
+            Bound::Included(&idx) => idx.checked_add(1)?,
+            Bound::Excluded(&idx) => idx,
+            Bound::Unbounded => index.len(),
+        };
+
+        Some(Self(start_idx..close_idx, index))
     }
 }
 
@@ -345,27 +390,79 @@ where
     }
 }
 
+pub(crate) trait NewFromRange<'a, R, L, Q>
+where
+    R: RangeBounds<&'a Q>,
+    L: Label + Borrow<Q>,
+    Q: 'a + Hash + Eq + ?Sized,
+{
+    fn new(range: R, index: &'a Index<L>) -> Option<LocRange<'a, L>>;
+}
+
+impl<'a, L> NewFromRange<'a, RangeFull, L, L> for LocRange<'a, L>
+where
+    L: Label,
+{
+    fn new(_range: RangeFull, index: &'a Index<L>) -> Option<Self> {
+        ILocRange::new(.., index).map(Self)
+    }
+}
+
+impl<'a, L, Q> NewFromRange<'a, Range<&'a Q>, L, Q> for LocRange<'a, L>
+where
+    L: Label + Borrow<Q>,
+    Q: 'a + Hash + Eq + ?Sized,
+{
+    fn new(range: Range<&'a Q>, index: &'a Index<L>) -> Option<Self> {
+        ILocRange::new(range_conv(index, range)?, index).map(Self)
+    }
+}
+
+impl<'a, L, Q> NewFromRange<'a, RangeFrom<&'a Q>, L, Q> for LocRange<'a, L>
+where
+    L: Label + Borrow<Q>,
+    Q: 'a + Hash + Eq + ?Sized,
+{
+    fn new(range: RangeFrom<&'a Q>, index: &'a Index<L>) -> Option<Self> {
+        ILocRange::new(range_conv(index, range)?, index).map(Self)
+    }
+}
+
+impl<'a, L, Q> NewFromRange<'a, RangeTo<&'a Q>, L, Q> for LocRange<'a, L>
+where
+    L: Label + Borrow<Q>,
+    Q: 'a + Hash + Eq + ?Sized,
+{
+    fn new(range: RangeTo<&'a Q>, index: &'a Index<L>) -> Option<Self> {
+        ILocRange::new(range_conv(index, range)?, index).map(Self)
+    }
+}
+
+impl<'a, L, Q> NewFromRange<'a, RangeToInclusive<&'a Q>, L, Q> for LocRange<'a, L>
+where
+    L: Label + Borrow<Q>,
+    Q: 'a + Hash + Eq + ?Sized,
+{
+    fn new(range: RangeToInclusive<&'a Q>, index: &'a Index<L>) -> Option<Self> {
+        ILocRange::new(range_conv(index, range)?, index).map(Self)
+    }
+}
+
+impl<'a, L, Q> NewFromRange<'a, RangeInclusive<&'a Q>, L, Q> for LocRange<'a, L>
+where
+    L: Label + Borrow<Q>,
+    Q: 'a + Hash + Eq + ?Sized,
+{
+    fn new(range: RangeInclusive<&'a Q>, index: &'a Index<L>) -> Option<Self> {
+        ILocRange::new(range_conv(index, range)?, index).map(Self)
+    }
+}
+
 /// A lazy iterator that yields indices from a loc range expression.
 pub struct LocRange<'a, L>(ILocRange<'a, L>)
 where
     L: Label,
 ;
-
-impl<'a, L> LocRange<'a, L>
-where
-    L: Label,
-{
-    pub(crate) fn new<Q>(a_lbl: &'a Q, b_lbl: &'a Q, index: &'a Index<L>) -> Option<Self>
-    where
-        L: Borrow<Q>,
-        Q: 'a + Hash + Eq,
-    {
-        // This returns the range from the first to the second label, inclusive.
-        let start_idx = index.loc(a_lbl)?;
-        let close_idx = index.loc(b_lbl).and_then(|i| i.checked_add(1))?;
-        ILocRange::new(start_idx..close_idx, index).map(Self)
-    }
-}
 
 impl<'a, L> Iterator for LocRange<'a, L>
 where
