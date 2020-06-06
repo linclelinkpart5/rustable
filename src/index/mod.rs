@@ -7,12 +7,6 @@ use std::hash::Hash;
 use std::iter::FromIterator;
 use std::ops::Bound;
 use std::ops::RangeBounds;
-use std::ops::Range;
-use std::ops::RangeFrom;
-use std::ops::RangeTo;
-use std::ops::RangeInclusive;
-use std::ops::RangeToInclusive;
-use std::ops::RangeFull;
 
 use indexmap::IndexSet;
 
@@ -102,8 +96,16 @@ impl<L: Label> Index<L> {
         self.0.sort_by(compare)
     }
 
+    fn valid_index(&self, idx: &usize) -> Option<usize> {
+        if idx < &self.len() { Some(*idx) } else { None }
+    }
+
+    fn to_nodule(&self, idx: &usize) -> Option<usize> {
+        if idx <= &self.len() { Some(*idx) } else { None }
+    }
+
     pub fn iloc(&self, idx: &usize) -> Option<usize> {
-        if idx < &self.0.len() { Some(*idx) } else { None }
+        self.valid_index(idx)
     }
 
     pub fn iloc_multi<'a, I>(&'a self, idxs: I) -> Option<Vec<usize>>
@@ -115,11 +117,24 @@ impl<L: Label> Index<L> {
         Some(res)
     }
 
-    pub fn iloc_multi_iter<'a, I>(&'a self, idxs: I) -> ILocMulti<'a, I::IntoIter, L>
+    fn iloc_range_owned<R>(&self, range: R) -> Option<Vec<usize>>
     where
-        I: IntoIterator<Item = &'a usize>,
+        R: RangeBounds<usize>,
     {
-        ILocMulti::new(idxs.into_iter(), self)
+        // NOTE: Range bounds are always validated, even if range would be empty.
+        let start_nodule = match range.start_bound() {
+            Bound::Included(idx) => self.to_nodule(idx)?,
+            Bound::Excluded(idx) => self.to_nodule(&idx.checked_add(1)?)?,
+            Bound::Unbounded => 0,
+        };
+
+        let close_nodule = match range.end_bound() {
+            Bound::Included(idx) => self.to_nodule(&idx.checked_add(1)?)?,
+            Bound::Excluded(idx) => self.to_nodule(idx)?,
+            Bound::Unbounded => self.len(),
+        };
+
+        Some((start_nodule..close_nodule).collect())
     }
 
     pub fn iloc_range<'a, R>(&'a self, range: R) -> Option<Vec<usize>>
@@ -127,54 +142,32 @@ impl<L: Label> Index<L> {
         R: RangeBounds<&'a usize>,
     {
         // NOTE: Range bounds are always validated, even if range would be empty.
-        let start_idx = match range.start_bound() {
-            Bound::Included(&idx) => Some(idx).filter(|&i| i < &self.len()).copied()?,
-            Bound::Excluded(&idx) => Some(idx).filter(|&i| i <= &self.len()).copied()? + 1,
-            Bound::Unbounded => 0,
-        };
-
-        let close_idx = match range.end_bound() {
-            Bound::Included(&idx) => Some(idx).filter(|&i| i < &self.len()).copied()? + 1,
-            Bound::Excluded(&idx) => Some(idx).filter(|&i| i <= &self.len()).copied()?,
-            Bound::Unbounded => self.len(),
-        };
-
-        let mut res = Vec::new();
-        for idx in start_idx..close_idx { res.push(self.iloc(&idx)?); }
-        Some(res)
-    }
-
-    pub fn iloc_range_iter<'a, R>(&'a self, range: R) -> Option<ILocRange<'a, L>>
-    where
-        R: RangeBounds<&'a usize>,
-    {
-        // NOTE: Need these in order to convert `&usize` to `usize`.
         let start_bound = match range.start_bound() {
+            Bound::Included(idx) => Bound::Included(*idx),
+            Bound::Excluded(idx) => Bound::Excluded(*idx),
             Bound::Unbounded => Bound::Unbounded,
-            Bound::Included(x) => Bound::Included(*x),
-            Bound::Excluded(x) => Bound::Excluded(*x),
         };
 
         let close_bound = match range.end_bound() {
+            Bound::Included(idx) => Bound::Included(*idx),
+            Bound::Excluded(idx) => Bound::Excluded(*idx),
             Bound::Unbounded => Bound::Unbounded,
-            Bound::Included(x) => Bound::Included(*x),
-            Bound::Excluded(x) => Bound::Excluded(*x),
         };
 
-        ILocRange::new((start_bound, close_bound), self)
+        self.iloc_range_owned((start_bound, close_bound))
     }
 
-    pub fn bloc<A>(&self, bools: A) -> Option<Vec<usize>>
+    pub fn bloc<'a, I>(&self, bools: I) -> Option<Vec<usize>>
     where
-        A: AsRef<[bool]>,
+        I: IntoIterator<Item = &'a bool>,
+        I::IntoIter: ExactSizeIterator,
     {
-        let bools = bools.as_ref();
+        let bools = bools.into_iter();
 
         if bools.len() != self.len() { None }
         else {
             Some(
                 bools
-                .iter()
                 .enumerate()
                 .filter_map(|(i, &b)| if b { Some(i) } else { None })
                 .collect()
@@ -197,6 +190,27 @@ impl<L: Label> Index<L> {
         Q: 'a + Hash + Eq + ?Sized,
     {
         lbls.into_iter().map(|lbl| self.loc(lbl)).collect::<Option<Vec<_>>>()
+    }
+
+    pub fn loc_range<'a, R, Q>(&'a self, range: R) -> Option<Vec<usize>>
+    where
+        R: RangeBounds<&'a Q>,
+        L: Borrow<Q>,
+        Q: 'a + Hash + Eq + ?Sized,
+    {
+        let start_bound = match range.start_bound() {
+            Bound::Included(lbl) => Bound::Included(self.loc(lbl)?),
+            Bound::Excluded(lbl) => Bound::Excluded(self.loc(lbl)?),
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        let close_bound = match range.end_bound() {
+            Bound::Included(lbl) => Bound::Included(self.loc(lbl)?),
+            Bound::Excluded(lbl) => Bound::Excluded(self.loc(lbl)?),
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        self.iloc_range_owned((start_bound, close_bound))
     }
 }
 
@@ -235,91 +249,6 @@ impl<L: Label> IntoIterator for Index<L> {
 
     fn into_iter(self) -> Self::IntoIter {
         IntoIter(self.0.into_iter())
-    }
-}
-
-/// Trait to help abstract over the differences among range types.
-trait TraitLocRange<R> {
-    fn loc_range(&self, range: R) -> Option<Vec<usize>>;
-}
-
-fn generic_loc_range_impl<'a, R, L, Q>(index: &Index<L>, range: R) -> Option<Vec<usize>>
-    where
-        R: RangeBounds<&'a Q>,
-        L: Borrow<Q> + Label,
-        Q: 'a + Hash + Eq + ?Sized,
-{
-    let start_idx = match range.start_bound() {
-        Bound::Included(lbl) => index.loc(lbl)?,
-        Bound::Excluded(lbl) => index.loc(lbl)? + 1,
-        Bound::Unbounded => 0,
-    };
-
-    let close_idx = match range.end_bound() {
-        Bound::Included(lbl) => index.loc(lbl)? + 1,
-        Bound::Excluded(lbl) => index.loc(lbl)?,
-        Bound::Unbounded => index.len(),
-    };
-
-    index.iloc_range(&start_idx..&close_idx)
-}
-
-impl<L> TraitLocRange<RangeFull> for Index<L>
-where
-    L: Label,
-{
-    fn loc_range(&self, _range: RangeFull) -> Option<Vec<usize>> {
-        generic_loc_range_impl::<RangeFull, L, L>(self, ..)
-    }
-}
-
-impl<'a, L, Q> TraitLocRange<Range<&'a Q>> for Index<L>
-where
-    L: Label + Borrow<Q>,
-    Q: 'a + Hash + Eq + ?Sized,
-{
-    fn loc_range(&self, range: Range<&'a Q>) -> Option<Vec<usize>> {
-        generic_loc_range_impl(self, range)
-    }
-}
-
-impl<'a, L, Q> TraitLocRange<RangeFrom<&'a Q>> for Index<L>
-where
-    L: Label + Borrow<Q>,
-    Q: 'a + Hash + Eq + ?Sized,
-{
-    fn loc_range(&self, range: RangeFrom<&'a Q>) -> Option<Vec<usize>> {
-        generic_loc_range_impl(self, range)
-    }
-}
-
-impl<'a, L, Q> TraitLocRange<RangeTo<&'a Q>> for Index<L>
-where
-    L: Label + Borrow<Q>,
-    Q: 'a + Hash + Eq + ?Sized,
-{
-    fn loc_range(&self, range: RangeTo<&'a Q>) -> Option<Vec<usize>> {
-        generic_loc_range_impl(self, range)
-    }
-}
-
-impl<'a, L, Q> TraitLocRange<RangeToInclusive<&'a Q>> for Index<L>
-where
-    L: Label + Borrow<Q>,
-    Q: 'a + Hash + Eq + ?Sized,
-{
-    fn loc_range(&self, range: RangeToInclusive<&'a Q>) -> Option<Vec<usize>> {
-        generic_loc_range_impl(self, range)
-    }
-}
-
-impl<'a, L, Q> TraitLocRange<RangeInclusive<&'a Q>> for Index<L>
-where
-    L: Label + Borrow<Q>,
-    Q: 'a + Hash + Eq + ?Sized,
-{
-    fn loc_range(&self, range: RangeInclusive<&'a Q>) -> Option<Vec<usize>> {
-        generic_loc_range_impl(self, range)
     }
 }
 
@@ -474,7 +403,7 @@ mod tests {
         assert_eq!(i.loc_range("ef"..), Some(vec![2, 3, 4, 5, 6, 7, 8, 9]));
         assert_eq!(i.loc_range(.."op"), Some(vec![0, 1, 2, 3, 4, 5, 6]));
         assert_eq!(i.loc_range(..="op"), Some(vec![0, 1, 2, 3, 4, 5, 6, 7]));
-        assert_eq!(i.loc_range(..), Some(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]));
+        assert_eq!(i.loc_range::<_, str>(..), Some(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]));
         assert_eq!(i.loc_range("ij".."kl"), Some(vec![4]));
         assert_eq!(i.loc_range("ij"..="kl"), Some(vec![4, 5]));
         assert_eq!(i.loc_range("ij".."ij"), Some(vec![]));
@@ -491,12 +420,12 @@ mod tests {
         assert_eq!(i.loc_range(..="???"), None);
         assert_eq!(i.loc_range("???"..), None);
 
-        assert_eq!(i.loc_range(..), i.iloc_range(&0..&i.len()));
+        assert_eq!(i.loc_range::<_, str>(..), i.iloc_range(&0..&i.len()));
         assert_eq!(i.loc_range(.."op"), i.iloc_range(..&7));
         assert_eq!(i.loc_range(..="op"), i.iloc_range(..=&7));
         assert_eq!(i.loc_range("ef"..), i.iloc_range(&2..));
 
-        assert_eq!(i.loc_range(..), i.loc_range("ab"..="st"));
+        assert_eq!(i.loc_range::<_, str>(..), i.loc_range("ab"..="st"));
         assert_eq!(i.loc_range(.."op"), i.loc_range("ab".."op"));
         assert_eq!(i.loc_range(..="op"), i.loc_range("ab"..="op"));
         assert_eq!(i.loc_range("ef"..), i.loc_range("ef"..="st"));
