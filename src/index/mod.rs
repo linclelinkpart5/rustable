@@ -19,8 +19,6 @@ use self::iter::Diff;
 use self::iter::SymDiff;
 use self::iter::Inter;
 use self::iter::Union;
-use self::iter::ILocMulti;
-use self::iter::ILocRange;
 
 #[derive(Debug, Clone)]
 pub struct Index<L: Label>(IndexSet<L>);
@@ -141,13 +139,14 @@ impl<L: Label> Index<L> {
     where
         R: RangeBounds<&'a usize>,
     {
-        // NOTE: Range bounds are always validated, even if range would be empty.
+        // TODO: Replace with `Bound::cloned()` when stable.
         let start_bound = match range.start_bound() {
             Bound::Included(idx) => Bound::Included(*idx),
             Bound::Excluded(idx) => Bound::Excluded(*idx),
             Bound::Unbounded => Bound::Unbounded,
         };
 
+        // TODO: Replace with `Bound::cloned()` when stable.
         let close_bound = match range.end_bound() {
             Bound::Included(idx) => Bound::Included(*idx),
             Bound::Excluded(idx) => Bound::Excluded(*idx),
