@@ -87,11 +87,22 @@ impl<L: Label> Index<L> {
     }
 
     pub fn sort(&mut self) {
-        self.0.sort()
+        self.sort_by(Ord::cmp)
     }
 
-    pub fn sort_by<F: FnMut(&L, &L) -> Ordering>(&mut self, compare: F) {
+    pub fn sort_by<F>(&mut self, compare: F)
+    where
+        F: FnMut(&L, &L) -> Ordering,
+    {
         self.0.sort_by(compare)
+    }
+
+    pub fn sort_by_key<F, K>(&mut self, mut get_key: F)
+    where
+        F: FnMut(&L) -> K,
+        K: Ord,
+    {
+        self.sort_by(|a, b| Ord::cmp(&get_key(a), &get_key(b)))
     }
 
     fn valid_index(&self, idx: &usize) -> Option<usize> {
@@ -254,6 +265,72 @@ impl<L: Label> IntoIterator for Index<L> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sort() {
+        let mut i = Index::from_vec(vec![9, 5, 3, 8, 6, 0, 1, 2, 7, 4]);
+        i.sort();
+        assert_eq!(i.into_iter().collect::<Vec<_>>(), vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+
+        let mut i = Index::from_vec(vec![
+            String::from("cam"),
+            String::from("ben"),
+            String::from("hal"),
+            String::from("eli"),
+            String::from("ida"),
+            String::from("jim"),
+            String::from("amy"),
+            String::from("dee"),
+            String::from("gus"),
+            String::from("fay"),
+        ]);
+        i.sort();
+        assert_eq!(i.into_iter().collect::<Vec<_>>(), vec![
+            String::from("amy"),
+            String::from("ben"),
+            String::from("cam"),
+            String::from("dee"),
+            String::from("eli"),
+            String::from("fay"),
+            String::from("gus"),
+            String::from("hal"),
+            String::from("ida"),
+            String::from("jim"),
+        ]);
+    }
+
+    #[test]
+    fn sort_by() {
+        let mut i = Index::from_vec(vec![9, 5, 3, 8, 6, 0, 1, 2, 7, 4]);
+        i.sort_by(|a, b| Ord::cmp(&(a % 5), &(b % 5)));
+        assert_eq!(i.into_iter().collect::<Vec<_>>(), vec![5, 0, 6, 1, 2, 7, 3, 8, 9, 4]);
+
+        let mut i = Index::from_vec(vec![
+            String::from("cam"),
+            String::from("ben"),
+            String::from("hal"),
+            String::from("eli"),
+            String::from("ida"),
+            String::from("jim"),
+            String::from("amy"),
+            String::from("dee"),
+            String::from("gus"),
+            String::from("fay"),
+        ]);
+        i.sort_by(|a, b| a.chars().rev().cmp(b.chars().rev()));
+        assert_eq!(i.into_iter().collect::<Vec<_>>(), vec![
+            String::from("ida"),
+            String::from("dee"),
+            String::from("eli"),
+            String::from("hal"),
+            String::from("cam"),
+            String::from("jim"),
+            String::from("ben"),
+            String::from("gus"),
+            String::from("fay"),
+            String::from("amy"),
+        ]);
+    }
 
     #[test]
     fn iloc() {
