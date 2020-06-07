@@ -336,6 +336,39 @@ mod tests {
     }
 
     #[test]
+    fn sort_by_key() {
+        let mut i = Index::from_vec(vec![9, 5, 3, 8, 6, 0, 1, 2, 7, 4]);
+        i.sort_by_key(|i| (5i32 - i).abs());
+        assert_eq!(i.into_iter().collect::<Vec<_>>(), vec![5, 6, 4, 3, 7, 8, 2, 9, 1, 0]);
+
+        let mut i = Index::from_vec(vec![
+            String::from("cam"),
+            String::from("ben"),
+            String::from("hal"),
+            String::from("eli"),
+            String::from("ida"),
+            String::from("jim"),
+            String::from("amy"),
+            String::from("dee"),
+            String::from("gus"),
+            String::from("fay"),
+        ]);
+        i.sort_by_key(|s| s.chars().nth(1));
+        assert_eq!(i.into_iter().collect::<Vec<_>>(), vec![
+            String::from("cam"),
+            String::from("hal"),
+            String::from("fay"),
+            String::from("ida"),
+            String::from("ben"),
+            String::from("dee"),
+            String::from("jim"),
+            String::from("eli"),
+            String::from("amy"),
+            String::from("gus"),
+        ]);
+    }
+
+    #[test]
     fn iloc() {
         let i = Index::from_iter("ideographs".chars());
 
