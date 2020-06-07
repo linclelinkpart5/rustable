@@ -21,9 +21,15 @@ use self::iter::Inter;
 use self::iter::Union;
 
 #[derive(Debug, Clone)]
-pub struct Index<L: Label>(IndexSet<L>);
+pub struct Index<L>(IndexSet<L>)
+where
+    L: Label,
+;
 
-impl<L: Label> Index<L> {
+impl<L> Index<L>
+where
+    L: Label,
+{
     pub fn new() -> Self {
         Self::default()
     }
@@ -236,26 +242,38 @@ where
     }
 }
 
-impl<L: Label> FromIterator<L> for Index<L> {
+impl<L> FromIterator<L> for Index<L>
+where
+    L: Label,
+{
     fn from_iter<I: IntoIterator<Item = L>>(iter: I) -> Self {
         Self(iter.into_iter().collect())
     }
 }
 
 // Handles `Index::from(&[0u32, 1, 2])`.
-impl<'a, L: Label + Copy + 'a> FromIterator<&'a L> for Index<L> {
+impl<'a, L> FromIterator<&'a L> for Index<L>
+where
+    L: 'a + Label + Copy
+{
     fn from_iter<I: IntoIterator<Item = &'a L>>(iter: I) -> Self {
         Self(iter.into_iter().copied().collect())
     }
 }
 
-impl<L: Label> Default for Index<L> {
+impl<L> Default for Index<L>
+where
+    L: Label,
+{
     fn default() -> Self {
         Self(IndexSet::new())
     }
 }
 
-impl<L: Label> IntoIterator for Index<L> {
+impl<L> IntoIterator for Index<L>
+where
+    L: Label,
+{
     type Item = L;
     type IntoIter = IntoIter<L>;
 
