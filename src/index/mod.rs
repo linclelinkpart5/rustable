@@ -86,92 +86,34 @@ impl<L: Label> Index<L> {
         Union::new(self, other)
     }
 
-    fn valid_index(&self, idx: &usize) -> Option<usize> {
-        if idx < &self.len() { Some(*idx) } else { None }
-    }
-
     fn to_nodule(&self, idx: &usize) -> Option<usize> {
         if idx <= &self.len() { Some(*idx) } else { None }
     }
 
-    /// Returns the position of a given label if it is in this `Index`.
-    pub fn index_of<Q>(&self, lbl: &Q) -> Option<usize>
+    /// Returns the position of a given label if contained in this `Index`.
+    pub fn index_of<Q>(&self, label: &Q) -> Option<usize>
     where
         L: Borrow<Q>,
         Q: Hash + Eq + ?Sized,
     {
-        self.0.get_index_of(lbl)
+        self.0.get_index_of(label)
     }
 
-    pub fn iloc(&self, idx: &usize) -> Option<usize> {
-        self.valid_index(idx)
-    }
-
-    pub fn by_pos(&self, pos: usize) -> Option<&L> {
+    pub fn iloc(&self, pos: usize) -> Option<&L> {
         self.0.get_index(pos)
     }
 
-    pub fn iloc_multi<'a, I>(&'a self, idxs: I) -> Option<Vec<usize>>
-    where
-        I: IntoIterator<Item = &'a usize>,
-    {
-        let mut res = Vec::new();
-        for idx in idxs { res.push(self.iloc(idx)?); }
-        Some(res)
-    }
-
-    pub fn by_pos_iter<'a, I>(&'a self, pos_iter: I) -> Option<Vec<&'a L>>
+    pub fn iloc_multi<'a, I>(&'a self, pos_iter: I) -> Option<Vec<&'a L>>
     where
         I: IntoIterator<Item = &'a usize>,
     {
         pos_iter
             .into_iter()
-            .map(|&p| self.by_pos(p))
+            .map(|&p| self.iloc(p))
             .collect::<Option<Vec<_>>>()
     }
 
-    fn iloc_range_owned<R>(&self, range: R) -> Option<Vec<usize>>
-    where
-        R: RangeBounds<usize>,
-    {
-        // NOTE: Range bounds are always validated, even if range would be empty.
-        let start_nodule = match range.start_bound() {
-            Bound::Included(idx) => self.to_nodule(idx)?,
-            Bound::Excluded(idx) => self.to_nodule(&idx.checked_add(1)?)?,
-            Bound::Unbounded => 0,
-        };
-
-        let close_nodule = match range.end_bound() {
-            Bound::Included(idx) => self.to_nodule(&idx.checked_add(1)?)?,
-            Bound::Excluded(idx) => self.to_nodule(idx)?,
-            Bound::Unbounded => self.len(),
-        };
-
-        Some((start_nodule..close_nodule).collect())
-    }
-
-    pub fn iloc_range<'a, R>(&'a self, range: R) -> Option<Vec<usize>>
-    where
-        R: RangeBounds<&'a usize>,
-    {
-        // TODO: Replace with `Bound::cloned()` when stable.
-        let start_bound = match range.start_bound() {
-            Bound::Included(idx) => Bound::Included(*idx),
-            Bound::Excluded(idx) => Bound::Excluded(*idx),
-            Bound::Unbounded => Bound::Unbounded,
-        };
-
-        // TODO: Replace with `Bound::cloned()` when stable.
-        let close_bound = match range.end_bound() {
-            Bound::Included(idx) => Bound::Included(*idx),
-            Bound::Excluded(idx) => Bound::Excluded(*idx),
-            Bound::Unbounded => Bound::Unbounded,
-        };
-
-        self.iloc_range_owned((start_bound, close_bound))
-    }
-
-    pub fn by_pos_range<R>(&self, range: R) -> Option<Vec<&L>>
+    pub fn iloc_range<R>(&self, range: R) -> Option<Vec<&L>>
     where
         R: RangeBounds<usize>,
     {
@@ -189,29 +131,11 @@ impl<L: Label> Index<L> {
         };
 
         (start_nodule..close_nodule)
-            .map(|p| self.by_pos(p))
+            .map(|p| self.iloc(p))
             .collect::<Option<Vec<_>>>()
     }
 
-    pub fn bloc<'a, I>(&self, bools: I) -> Option<Vec<usize>>
-    where
-        I: IntoIterator<Item = &'a bool>,
-        I::IntoIter: ExactSizeIterator,
-    {
-        let bools = bools.into_iter();
-
-        if bools.len() != self.len() { None }
-        else {
-            Some(
-                bools
-                .enumerate()
-                .filter_map(|(i, &b)| if b { Some(i) } else { None })
-                .collect()
-            )
-        }
-    }
-
-    pub fn by_sel<'a, I, A>(&self, bools: I) -> Option<Vec<&L>>
+    pub fn bloc<'a, I, A>(&self, bools: I) -> Option<Vec<&L>>
     where
         I: IntoIterator<Item = A>,
         I::IntoIter: ExactSizeIterator,
@@ -230,15 +154,7 @@ impl<L: Label> Index<L> {
         }
     }
 
-    pub fn loc<Q>(&self, lbl: &Q) -> Option<usize>
-    where
-        L: Borrow<Q>,
-        Q: Hash + Eq + ?Sized,
-    {
-        self.0.get_index_of(lbl)
-    }
-
-    pub fn by_loc<Q>(&self, label: &Q) -> Option<&L>
+    pub fn loc<Q>(&self, label: &Q) -> Option<&L>
     where
         L: Borrow<Q>,
         Q: Hash + Eq + ?Sized,
@@ -246,64 +162,34 @@ impl<L: Label> Index<L> {
         self.0.get(label)
     }
 
-    pub fn loc_multi<'a, I, Q>(&self, lbls: I) -> Option<Vec<usize>>
+    pub fn loc_multi<'a, I, Q>(&self, labels: I) -> Option<Vec<&L>>
     where
         I: IntoIterator<Item = &'a Q>,
         L: Borrow<Q>,
         Q: 'a + Hash + Eq + ?Sized,
     {
-        lbls.into_iter().map(|lbl| self.loc(lbl)).collect::<Option<Vec<_>>>()
+        labels.into_iter().map(|lbl| self.loc(lbl)).collect()
     }
 
-    pub fn by_loc_iter<'a, I, Q>(&self, labels: I) -> Option<Vec<&L>>
-    where
-        I: IntoIterator<Item = &'a Q>,
-        L: Borrow<Q>,
-        Q: 'a + Hash + Eq + ?Sized,
-    {
-        labels.into_iter().map(|lbl| self.by_loc(lbl)).collect()
-    }
-
-    pub fn loc_range<'a, R, Q>(&'a self, range: R) -> Option<Vec<usize>>
+    pub fn loc_range<'a, R, Q>(&'a self, range: R) -> Option<Vec<&L>>
     where
         R: RangeBounds<&'a Q>,
         L: Borrow<Q>,
         Q: 'a + Hash + Eq + ?Sized,
     {
         let start_bound = match range.start_bound() {
-            Bound::Included(lbl) => Bound::Included(self.loc(lbl)?),
-            Bound::Excluded(lbl) => Bound::Excluded(self.loc(lbl)?),
+            Bound::Included(lbl) => Bound::Included(self.index_of(lbl)?),
+            Bound::Excluded(lbl) => Bound::Excluded(self.index_of(lbl)?),
             Bound::Unbounded => Bound::Unbounded,
         };
 
         let close_bound = match range.end_bound() {
-            Bound::Included(lbl) => Bound::Included(self.loc(lbl)?),
-            Bound::Excluded(lbl) => Bound::Excluded(self.loc(lbl)?),
+            Bound::Included(lbl) => Bound::Included(self.index_of(lbl)?),
+            Bound::Excluded(lbl) => Bound::Excluded(self.index_of(lbl)?),
             Bound::Unbounded => Bound::Unbounded,
         };
 
-        self.iloc_range_owned((start_bound, close_bound))
-    }
-
-    pub fn by_loc_range<'a, R, Q>(&'a self, range: R) -> Option<Vec<&L>>
-    where
-        R: RangeBounds<&'a Q>,
-        L: Borrow<Q>,
-        Q: 'a + Hash + Eq + ?Sized,
-    {
-        let start_bound = match range.start_bound() {
-            Bound::Included(lbl) => Bound::Included(self.loc(lbl)?),
-            Bound::Excluded(lbl) => Bound::Excluded(self.loc(lbl)?),
-            Bound::Unbounded => Bound::Unbounded,
-        };
-
-        let close_bound = match range.end_bound() {
-            Bound::Included(lbl) => Bound::Included(self.loc(lbl)?),
-            Bound::Excluded(lbl) => Bound::Excluded(self.loc(lbl)?),
-            Bound::Unbounded => Bound::Unbounded,
-        };
-
-        self.by_pos_range((start_bound, close_bound))
+        self.iloc_range((start_bound, close_bound))
     }
 
     /// Sorts this `Index` in ascending order.
@@ -493,7 +379,7 @@ mod tests {
         assert_eq!(res.iter().max(), Some(&(i.len() - 1)));
         assert_eq!(res.iter().collect::<HashSet<_>>().len(), i.len());
         assert_eq!(res, vec![5, 6, 7, 2, 9, 1, 4, 8, 3, 0]);
-        assert_eq!(i.by_pos_iter(&res), Some(vec![&0, &1, &2, &3, &4, &5, &6, &7, &8, &9]));
+        assert_eq!(i.iloc_multi(&res), Some(vec![&0, &1, &2, &3, &4, &5, &6, &7, &8, &9]));
 
         let i = Index::from_vec(vec![
             str!("cam"),
@@ -512,7 +398,7 @@ mod tests {
         assert_eq!(res.iter().max(), Some(&(i.len() - 1)));
         assert_eq!(res.iter().collect::<HashSet<_>>().len(), i.len());
         assert_eq!(res, vec![6, 1, 0, 7, 3, 9, 8, 2, 4, 5]);
-        assert_eq!(i.by_pos_iter(&res), Some(vec![
+        assert_eq!(i.iloc_multi(&res), Some(vec![
             &str!("amy"),
             &str!("ben"),
             &str!("cam"),
@@ -530,174 +416,416 @@ mod tests {
     fn iloc() {
         let i = Index::from_iter("ideographs".chars());
 
-        assert_eq!(i.iloc(&0), Some(0));
-        assert_eq!(i.iloc(&1), Some(1));
-        assert_eq!(i.iloc(&2), Some(2));
-        assert_eq!(i.iloc(&3), Some(3));
-        assert_eq!(i.iloc(&4), Some(4));
-        assert_eq!(i.iloc(&5), Some(5));
-        assert_eq!(i.iloc(&6), Some(6));
-        assert_eq!(i.iloc(&7), Some(7));
-        assert_eq!(i.iloc(&8), Some(8));
-        assert_eq!(i.iloc(&9), Some(9));
-        assert_eq!(i.iloc(&42), None);
+        assert_eq!(i.iloc(0), Some(&'i'));
+        assert_eq!(i.iloc(1), Some(&'d'));
+        assert_eq!(i.iloc(2), Some(&'e'));
+        assert_eq!(i.iloc(3), Some(&'o'));
+        assert_eq!(i.iloc(4), Some(&'g'));
+        assert_eq!(i.iloc(5), Some(&'r'));
+        assert_eq!(i.iloc(6), Some(&'a'));
+        assert_eq!(i.iloc(7), Some(&'p'));
+        assert_eq!(i.iloc(8), Some(&'h'));
+        assert_eq!(i.iloc(9), Some(&'s'));
+        assert_eq!(i.iloc(42), None);
     }
 
     #[test]
     fn iloc_multi() {
-        let i = Index::from_slice(&[10u32, 20, 30, 40, 50]);
+        let i = Index::from_iter("ideographs".chars());
 
-        assert_eq!(i.iloc_multi(&[]), Some(vec![]));
-        assert_eq!(i.iloc_multi(&[2]), Some(vec![2]));
-        assert_eq!(i.iloc_multi(&[0, 1, 2, 3]), Some(vec![0, 1, 2, 3]));
-        assert_eq!(i.iloc_multi(&[4, 3, 2, 1]), Some(vec![4, 3, 2, 1]));
-        assert_eq!(i.iloc_multi(&[9]), None);
-        assert_eq!(i.iloc_multi(&[9, 1, 2, 3, 4]), None);
-        assert_eq!(i.iloc_multi(&[0, 1, 2, 3, 9]), None);
+        assert_eq!(
+            i.iloc_multi(&[]),
+            Some(vec![]),
+        );
+        assert_eq!(
+            i.iloc_multi(&[2]),
+            Some(vec![&'e']),
+        );
+        assert_eq!(
+            i.iloc_multi(&[4, 3, 3, 9, 2]),
+            Some(vec![&'g', &'o', &'o', &'s', &'e']),
+        );
+        assert_eq!(
+            i.iloc_multi(&[9, 7, 8, 2, 5, 2]),
+            Some(vec![&'s', &'p', &'h', &'e', &'r', &'e']),
+        );
+        assert_eq!(
+            i.iloc_multi(&[42]),
+            None,
+        );
+        assert_eq!(
+            i.iloc_multi(&[42, 1, 2, 3, 4]),
+            None,
+        );
+        assert_eq!(
+            i.iloc_multi(&[0, 1, 2, 3, 42]),
+            None,
+        );
     }
 
     #[test]
     fn iloc_range() {
-        let i = Index::from_iter("jihgfedcba".chars());
+        let i = Index::from_iter("ideographs".chars());
 
-        assert_eq!(i.iloc_range(&2..&7), Some(vec![2, 3, 4, 5, 6]));
-        assert_eq!(i.iloc_range(&2..=&7), Some(vec![2, 3, 4, 5, 6, 7]));
-        assert_eq!(i.iloc_range(&2..), Some(vec![2, 3, 4, 5, 6, 7, 8, 9]));
-        assert_eq!(i.iloc_range(..&7), Some(vec![0, 1, 2, 3, 4, 5, 6]));
-        assert_eq!(i.iloc_range(..=&7), Some(vec![0, 1, 2, 3, 4, 5, 6, 7]));
-        assert_eq!(i.iloc_range(..), Some(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]));
-        assert_eq!(i.iloc_range(&4..&5), Some(vec![4]));
-        assert_eq!(i.iloc_range(&4..=&5), Some(vec![4, 5]));
-        assert_eq!(i.iloc_range(&4..&4), Some(vec![]));
-        assert_eq!(i.iloc_range(&4..=&4), Some(vec![4]));
-        assert_eq!(i.iloc_range(&6..&3), Some(vec![]));
-        assert_eq!(i.iloc_range(&6..=&3), Some(vec![]));
-        assert_eq!(i.iloc_range(&5..&4), Some(vec![]));
-        assert_eq!(i.iloc_range(&5..=&4), Some(vec![]));
-        assert_eq!(i.iloc_range(&0..&42), None);
-        assert_eq!(i.iloc_range(&0..=&42), None);
-        assert_eq!(i.iloc_range(&42..&9), None);
-        assert_eq!(i.iloc_range(&42..=&9), None);
-        assert_eq!(i.iloc_range(..&42), None);
-        assert_eq!(i.iloc_range(..=&42), None);
-        assert_eq!(i.iloc_range(&42..), None);
+        // Test normal usage.
 
-        assert_eq!(i.iloc_range(..), i.iloc_range(&0..&i.len()));
-        assert_eq!(i.iloc_range(..), i.iloc_range(&0..=&9));
-        assert_eq!(i.iloc_range(..&7), i.iloc_range(&0..&7));
-        assert_eq!(i.iloc_range(..=&7), i.iloc_range(&0..=&7));
-        assert_eq!(i.iloc_range(&2..), i.iloc_range(&2..=&9));
+        assert_eq!(
+            i.iloc_range(2..7),
+            Some(vec![&'e', &'o', &'g', &'r', &'a']),
+        );
+        assert_eq!(
+            i.iloc_range(2..=7),
+            Some(vec![&'e', &'o', &'g', &'r', &'a', &'p']),
+        );
+        assert_eq!(
+            i.iloc_range(2..),
+            Some(vec![&'e', &'o', &'g', &'r', &'a', &'p', &'h', &'s']),
+        );
+        assert_eq!(
+            i.iloc_range(..7),
+            Some(vec![&'i', &'d', &'e', &'o', &'g', &'r', &'a']),
+        );
+        assert_eq!(
+            i.iloc_range(..=7),
+            Some(vec![&'i', &'d', &'e', &'o', &'g', &'r', &'a', &'p']),
+        );
+        assert_eq!(
+            i.iloc_range(..),
+            Some(vec![&'i', &'d', &'e', &'o', &'g', &'r', &'a', &'p', &'h', &'s']),
+        );
+        assert_eq!(
+            i.iloc_range(4..5),
+            Some(vec![&'g']),
+        );
+        assert_eq!(
+            i.iloc_range(4..=5),
+            Some(vec![&'g', &'r']),
+        );
+        assert_eq!(
+            i.iloc_range(4..4),
+            Some(vec![]),
+        );
+        assert_eq!(
+            i.iloc_range(4..=4),
+            Some(vec![&'g']),
+        );
+        assert_eq!(
+            i.iloc_range(6..3),
+            Some(vec![]),
+        );
+        assert_eq!(
+            i.iloc_range(6..=3),
+            Some(vec![]),
+        );
+        assert_eq!(
+            i.iloc_range(5..4),
+            Some(vec![]),
+        );
+        assert_eq!(
+            i.iloc_range(5..=4),
+            Some(vec![]),
+        );
+        assert_eq!(
+            i.iloc_range(0..42),
+            None,
+        );
+        assert_eq!(
+            i.iloc_range(0..=42),
+            None,
+        );
+        assert_eq!(
+            i.iloc_range(42..9),
+            None,
+        );
+        assert_eq!(
+            i.iloc_range(42..=9),
+            None,
+        );
+        assert_eq!(
+            i.iloc_range(..42),
+            None,
+        );
+        assert_eq!(
+            i.iloc_range(..=42),
+            None,
+        );
+        assert_eq!(
+            i.iloc_range(42..),
+            None,
+        );
+
+        // Test expected invariants.
+
+        assert_eq!(
+            i.iloc_range(..),
+            i.iloc_range(0..i.len()),
+        );
+        assert_eq!(
+            i.iloc_range(..),
+            i.iloc_range(0..=9),
+        );
+        assert_eq!(
+            i.iloc_range(..7),
+            i.iloc_range(0..7),
+        );
+        assert_eq!(
+            i.iloc_range(..=7),
+            i.iloc_range(0..=7),
+        );
+        assert_eq!(
+            i.iloc_range(2..),
+            i.iloc_range(2..=9),
+        );
+
+        // Test edge cases.
+
+        let empty: Index<char> = Index::new();
+        assert_eq!(empty.iloc_range(0..0), Some(vec![]));
+        assert_eq!(empty.iloc_range(0..=0), None);
+        assert_eq!(empty.iloc_range(0..), Some(vec![]));
+        assert_eq!(empty.iloc_range(..0), Some(vec![]));
+        assert_eq!(empty.iloc_range(..=0), None);
+        assert_eq!(empty.iloc_range(..), Some(vec![]));
+
+        let index = Index::from_slice(&[10]);
+        assert_eq!(index.iloc_range(0..1), Some(vec![&10]));
+        assert_eq!(index.iloc_range(0..=0), Some(vec![&10]));
+        assert_eq!(index.iloc_range(0..=1), None);
+        assert_eq!(index.iloc_range(1..1), Some(vec![]));
+        assert_eq!(index.iloc_range(1..=1), None);
+        assert_eq!(index.iloc_range(2..2), None);
+        assert_eq!(index.iloc_range(2..1), None);
+        assert_eq!(index.iloc_range(2..=2), None);
+        assert_eq!(index.iloc_range(2..=1), None);
+        assert_eq!(index.iloc_range(..2), None);
+        assert_eq!(index.iloc_range(..=2), None);
+        assert_eq!(index.iloc_range(2..), None);
     }
 
     #[test]
     fn loc() {
         let i = Index::from_iter("ideographs".chars());
 
-        assert_eq!(i.loc(&'i'), Some(0));
-        assert_eq!(i.loc(&'d'), Some(1));
-        assert_eq!(i.loc(&'e'), Some(2));
-        assert_eq!(i.loc(&'o'), Some(3));
-        assert_eq!(i.loc(&'g'), Some(4));
-        assert_eq!(i.loc(&'r'), Some(5));
-        assert_eq!(i.loc(&'a'), Some(6));
-        assert_eq!(i.loc(&'p'), Some(7));
-        assert_eq!(i.loc(&'h'), Some(8));
-        assert_eq!(i.loc(&'s'), Some(9));
+        assert_eq!(i.loc(&'i'), Some(&'i'));
+        assert_eq!(i.loc(&'d'), Some(&'d'));
+        assert_eq!(i.loc(&'e'), Some(&'e'));
+        assert_eq!(i.loc(&'o'), Some(&'o'));
+        assert_eq!(i.loc(&'g'), Some(&'g'));
+        assert_eq!(i.loc(&'r'), Some(&'r'));
+        assert_eq!(i.loc(&'a'), Some(&'a'));
+        assert_eq!(i.loc(&'p'), Some(&'p'));
+        assert_eq!(i.loc(&'h'), Some(&'h'));
+        assert_eq!(i.loc(&'s'), Some(&'s'));
         assert_eq!(i.loc(&'x'), None);
     }
 
     #[test]
     fn loc_multi() {
-        let i = Index::from_slice(&[10u32, 20, 30, 40, 50]);
+        let i = Index::from_iter("ideographs".chars());
 
-        assert_eq!(i.loc_multi(&[]), Some(vec![]));
-        assert_eq!(i.loc_multi(&[30]), Some(vec![2]));
-        assert_eq!(i.loc_multi(&[10, 20, 30, 40]), Some(vec![0, 1, 2, 3]));
-        assert_eq!(i.loc_multi(&[50, 40, 30, 20]), Some(vec![4, 3, 2, 1]));
-        assert_eq!(i.loc_multi(&[99]), None);
-        assert_eq!(i.loc_multi(&[99, 20, 30, 40, 50]), None);
-        assert_eq!(i.loc_multi(&[10, 20, 30, 40, 99]), None);
+        assert_eq!(
+            i.loc_multi(&[]),
+            Some(vec![]),
+        );
+        assert_eq!(
+            i.loc_multi(&['e']),
+            Some(vec![&'e']),
+        );
+        assert_eq!(
+            i.loc_multi(&['g', 'o', 'o', 's', 'e']),
+            Some(vec![&'g', &'o', &'o', &'s', &'e']),
+        );
+        assert_eq!(
+            i.loc_multi(&['s', 'p', 'h', 'e', 'r', 'e']),
+            Some(vec![&'s', &'p', &'h', &'e', &'r', &'e']),
+        );
+        assert_eq!(
+            i.loc_multi(&['x']),
+            None,
+        );
+        assert_eq!(
+            i.loc_multi(&['x', 'd', 'e', 'o', 'g']),
+            None,
+        );
+        assert_eq!(
+            i.loc_multi(&['i', 'd', 'e', 'o', 'x']),
+            None,
+        );
     }
 
     #[test]
     fn loc_range() {
-        let i = Index::from_iter("jihgfedcba".chars());
+        let i = Index::from_iter("ideographs".chars());
 
-        assert_eq!(i.loc_range(&'h'..&'c'), Some(vec![2, 3, 4, 5, 6]));
-        assert_eq!(i.loc_range(&'h'..=&'c'), Some(vec![2, 3, 4, 5, 6, 7]));
-        assert_eq!(i.loc_range(&'h'..), Some(vec![2, 3, 4, 5, 6, 7, 8, 9]));
-        assert_eq!(i.loc_range(..&'c'), Some(vec![0, 1, 2, 3, 4, 5, 6]));
-        assert_eq!(i.loc_range(..=&'c'), Some(vec![0, 1, 2, 3, 4, 5, 6, 7]));
-        assert_eq!(i.loc_range(..), Some(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]));
-        assert_eq!(i.loc_range(&'f'..&'e'), Some(vec![4]));
-        assert_eq!(i.loc_range(&'f'..=&'e'), Some(vec![4, 5]));
-        assert_eq!(i.loc_range(&'f'..&'f'), Some(vec![]));
-        assert_eq!(i.loc_range(&'f'..=&'f'), Some(vec![4]));
-        assert_eq!(i.loc_range(&'d'..&'g'), Some(vec![]));
-        assert_eq!(i.loc_range(&'d'..=&'g'), Some(vec![]));
-        assert_eq!(i.loc_range(&'e'..&'f'), Some(vec![]));
-        assert_eq!(i.loc_range(&'e'..=&'f'), Some(vec![]));
-        assert_eq!(i.loc_range(&'j'..&'x'), None);
-        assert_eq!(i.loc_range(&'j'..=&'x'), None);
-        assert_eq!(i.loc_range(&'x'..&'a'), None);
-        assert_eq!(i.loc_range(&'x'..=&'a'), None);
-        assert_eq!(i.loc_range(..&'x'), None);
-        assert_eq!(i.loc_range(..=&'x'), None);
-        assert_eq!(i.loc_range(&'x'..), None);
+        // Test normal usage.
 
-        assert_eq!(i.loc_range(..), i.iloc_range(&0..&i.len()));
-        assert_eq!(i.loc_range(..&'c'), i.iloc_range(..&7));
-        assert_eq!(i.loc_range(..=&'c'), i.iloc_range(..=&7));
-        assert_eq!(i.loc_range(&'h'..), i.iloc_range(&2..));
+        assert_eq!(
+            i.loc_range(&'e'..&'p'),
+            Some(vec![&'e', &'o', &'g', &'r', &'a']),
+        );
+        assert_eq!(
+            i.loc_range(&'e'..=&'p'),
+            Some(vec![&'e', &'o', &'g', &'r', &'a', &'p']),
+        );
+        assert_eq!(
+            i.loc_range(&'e'..),
+            Some(vec![&'e', &'o', &'g', &'r', &'a', &'p', &'h', &'s']),
+        );
+        assert_eq!(
+            i.loc_range(..&'p'),
+            Some(vec![&'i', &'d', &'e', &'o', &'g', &'r', &'a']),
+        );
+        assert_eq!(
+            i.loc_range(..=&'p'),
+            Some(vec![&'i', &'d', &'e', &'o', &'g', &'r', &'a', &'p']),
+        );
+        assert_eq!(
+            i.loc_range(..),
+            Some(vec![&'i', &'d', &'e', &'o', &'g', &'r', &'a', &'p', &'h', &'s']),
+        );
+        assert_eq!(
+            i.loc_range(&'g'..&'r'),
+            Some(vec![&'g']),
+        );
+        assert_eq!(
+            i.loc_range(&'g'..=&'r'),
+            Some(vec![&'g', &'r']),
+        );
+        assert_eq!(
+            i.loc_range(&'g'..&'g'),
+            Some(vec![]),
+        );
+        assert_eq!(
+            i.loc_range(&'g'..=&'g'),
+            Some(vec![&'g']),
+        );
+        assert_eq!(
+            i.loc_range(&'a'..&'o'),
+            Some(vec![]),
+        );
+        assert_eq!(
+            i.loc_range(&'a'..=&'o'),
+            Some(vec![]),
+        );
+        assert_eq!(
+            i.loc_range(&'r'..&'g'),
+            Some(vec![]),
+        );
+        assert_eq!(
+            i.loc_range(&'r'..=&'g'),
+            Some(vec![]),
+        );
+        assert_eq!(
+            i.loc_range(&'i'..&'x'),
+            None,
+        );
+        assert_eq!(
+            i.loc_range(&'i'..=&'x'),
+            None,
+        );
+        assert_eq!(
+            i.loc_range(&'x'..&'s'),
+            None,
+        );
+        assert_eq!(
+            i.loc_range(&'x'..=&'s'),
+            None,
+        );
+        assert_eq!(
+            i.loc_range(..&'x'),
+            None,
+        );
+        assert_eq!(
+            i.loc_range(..=&'x'),
+            None,
+        );
+        assert_eq!(
+            i.loc_range(&'x'..),
+            None,
+        );
 
-        assert_eq!(i.loc_range(..), i.loc_range(&'j'..=&'a'));
-        assert_eq!(i.loc_range(..&'c'), i.loc_range(&'j'..&'c'));
-        assert_eq!(i.loc_range(..=&'c'), i.loc_range(&'j'..=&'c'));
-        assert_eq!(i.loc_range(&'h'..), i.loc_range(&'h'..=&'a'));
+        // Test expected invariants.
 
-        let i: Index<std::string::String> = Index::from_vec(vec![
-            str!("ab"),
-            str!("cd"),
-            str!("ef"),
-            str!("gh"),
-            str!("ij"),
-            str!("kl"),
-            str!("mn"),
-            str!("op"),
-            str!("qr"),
-            str!("st"),
-        ]);
+        assert_eq!(
+            i.loc_range(..),
+            i.loc_range(&'i'..=&'s'),
+        );
+        assert_eq!(
+            i.loc_range(..&'p'),
+            i.loc_range(&'i'..&'p'),
+        );
+        assert_eq!(
+            i.loc_range(..=&'p'),
+            i.loc_range(&'i'..=&'p'),
+        );
+        assert_eq!(
+            i.loc_range(&'e'..),
+            i.loc_range(&'e'..=&'s'),
+        );
 
-        assert_eq!(i.loc_range("ef".."op"), Some(vec![2, 3, 4, 5, 6]));
-        assert_eq!(i.loc_range("ef"..="op"), Some(vec![2, 3, 4, 5, 6, 7]));
-        assert_eq!(i.loc_range("ef"..), Some(vec![2, 3, 4, 5, 6, 7, 8, 9]));
-        assert_eq!(i.loc_range(.."op"), Some(vec![0, 1, 2, 3, 4, 5, 6]));
-        assert_eq!(i.loc_range(..="op"), Some(vec![0, 1, 2, 3, 4, 5, 6, 7]));
-        assert_eq!(i.loc_range::<_, str>(..), Some(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]));
-        assert_eq!(i.loc_range("ij".."kl"), Some(vec![4]));
-        assert_eq!(i.loc_range("ij"..="kl"), Some(vec![4, 5]));
-        assert_eq!(i.loc_range("ij".."ij"), Some(vec![]));
-        assert_eq!(i.loc_range("ij"..="ij"), Some(vec![4]));
-        assert_eq!(i.loc_range("mn".."gh"), Some(vec![]));
-        assert_eq!(i.loc_range("mn"..="gh"), Some(vec![]));
-        assert_eq!(i.loc_range("kl".."ij"), Some(vec![]));
-        assert_eq!(i.loc_range("kl"..="ij"), Some(vec![]));
-        assert_eq!(i.loc_range("ab".."???"), None);
-        assert_eq!(i.loc_range("ab"..="???"), None);
-        assert_eq!(i.loc_range("???".."ab"), None);
-        assert_eq!(i.loc_range("???"..="ab"), None);
-        assert_eq!(i.loc_range(.."???"), None);
-        assert_eq!(i.loc_range(..="???"), None);
-        assert_eq!(i.loc_range("???"..), None);
+        // Test edge cases.
 
-        assert_eq!(i.loc_range::<_, str>(..), i.iloc_range(&0..&i.len()));
-        assert_eq!(i.loc_range(.."op"), i.iloc_range(..&7));
-        assert_eq!(i.loc_range(..="op"), i.iloc_range(..=&7));
-        assert_eq!(i.loc_range("ef"..), i.iloc_range(&2..));
+        let empty: Index<char> = Index::new();
+        assert_eq!(empty.loc_range(&'x'..&'x'), None);
+        assert_eq!(empty.loc_range(&'x'..=&'x'), None);
+        assert_eq!(empty.loc_range(&'x'..), None);
+        assert_eq!(empty.loc_range(..&'x'), None);
+        assert_eq!(empty.loc_range(..=&'x'), None);
+        assert_eq!(empty.loc_range(..), Some(vec![]));
 
-        assert_eq!(i.loc_range::<_, str>(..), i.loc_range("ab"..="st"));
-        assert_eq!(i.loc_range(.."op"), i.loc_range("ab".."op"));
-        assert_eq!(i.loc_range(..="op"), i.loc_range("ab"..="op"));
-        assert_eq!(i.loc_range("ef"..), i.loc_range("ef"..="st"));
+        let index = Index::from_slice(&[10]);
+        assert_eq!(index.loc_range(&10..&20), None);
+        assert_eq!(index.loc_range(&10..=&10), Some(vec![&10]));
+        assert_eq!(index.loc_range(&10..=&20), None);
+        assert_eq!(index.loc_range(&20..&20), None);
+        assert_eq!(index.loc_range(&20..=&20), None);
+        assert_eq!(index.loc_range(..&20), None);
+        assert_eq!(index.loc_range(..=&20), None);
+        assert_eq!(index.loc_range(&20..), None);
+
+        // let i = Index::from_vec(vec![
+        //     str!("ab"),
+        //     str!("cd"),
+        //     str!("ef"),
+        //     str!("gh"),
+        //     str!("ij"),
+        //     str!("kl"),
+        //     str!("mn"),
+        //     str!("op"),
+        //     str!("qr"),
+        //     str!("st"),
+        // ]);
+
+        // assert_eq!(i.loc_range("ef".."op"), Some(vec![2, 3, 4, 5, 6]));
+        // assert_eq!(i.loc_range("ef"..="op"), Some(vec![2, 3, 4, 5, 6, 7]));
+        // assert_eq!(i.loc_range("ef"..), Some(vec![2, 3, 4, 5, 6, 7, 8, 9]));
+        // assert_eq!(i.loc_range(.."op"), Some(vec![0, 1, 2, 3, 4, 5, 6]));
+        // assert_eq!(i.loc_range(..="op"), Some(vec![0, 1, 2, 3, 4, 5, 6, 7]));
+        // assert_eq!(i.loc_range::<_, str>(..), Some(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]));
+        // assert_eq!(i.loc_range("ij".."kl"), Some(vec![4]));
+        // assert_eq!(i.loc_range("ij"..="kl"), Some(vec![4, 5]));
+        // assert_eq!(i.loc_range("ij".."ij"), Some(vec![]));
+        // assert_eq!(i.loc_range("ij"..="ij"), Some(vec![4]));
+        // assert_eq!(i.loc_range("mn".."gh"), Some(vec![]));
+        // assert_eq!(i.loc_range("mn"..="gh"), Some(vec![]));
+        // assert_eq!(i.loc_range("kl".."ij"), Some(vec![]));
+        // assert_eq!(i.loc_range("kl"..="ij"), Some(vec![]));
+        // assert_eq!(i.loc_range("ab".."??"), None);
+        // assert_eq!(i.loc_range("ab"..="??"), None);
+        // assert_eq!(i.loc_range("??".."ab"), None);
+        // assert_eq!(i.loc_range("??"..="ab"), None);
+        // assert_eq!(i.loc_range(.."??"), None);
+        // assert_eq!(i.loc_range(..="??"), None);
+        // assert_eq!(i.loc_range("??"..), None);
+
+        // assert_eq!(i.loc_range::<_, str>(..), i.iloc_range(&0..&i.len()));
+        // assert_eq!(i.loc_range(.."op"), i.iloc_range(..&7));
+        // assert_eq!(i.loc_range(..="op"), i.iloc_range(..=&7));
+        // assert_eq!(i.loc_range("ef"..), i.iloc_range(&2..));
+
+        // assert_eq!(i.loc_range::<_, str>(..), i.loc_range("ab"..="st"));
+        // assert_eq!(i.loc_range(.."op"), i.loc_range("ab".."op"));
+        // assert_eq!(i.loc_range(..="op"), i.loc_range("ab"..="op"));
+        // assert_eq!(i.loc_range("ef"..), i.loc_range("ef"..="st"));
     }
 }
