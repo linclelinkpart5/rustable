@@ -587,19 +587,19 @@ mod tests {
         assert_eq!(empty.iloc_range(..=0), None);
         assert_eq!(empty.iloc_range(..), Some(vec![]));
 
-        let index = Index::from_slice(&[10]);
-        assert_eq!(index.iloc_range(0..1), Some(vec![&10]));
-        assert_eq!(index.iloc_range(0..=0), Some(vec![&10]));
-        assert_eq!(index.iloc_range(0..=1), None);
-        assert_eq!(index.iloc_range(1..1), Some(vec![]));
-        assert_eq!(index.iloc_range(1..=1), None);
-        assert_eq!(index.iloc_range(2..2), None);
-        assert_eq!(index.iloc_range(2..1), None);
-        assert_eq!(index.iloc_range(2..=2), None);
-        assert_eq!(index.iloc_range(2..=1), None);
-        assert_eq!(index.iloc_range(..2), None);
-        assert_eq!(index.iloc_range(..=2), None);
-        assert_eq!(index.iloc_range(2..), None);
+        let single = Index::from_slice(&[10]);
+        assert_eq!(single.iloc_range(0..1), Some(vec![&10]));
+        assert_eq!(single.iloc_range(0..=0), Some(vec![&10]));
+        assert_eq!(single.iloc_range(0..=1), None);
+        assert_eq!(single.iloc_range(1..1), Some(vec![]));
+        assert_eq!(single.iloc_range(1..=1), None);
+        assert_eq!(single.iloc_range(2..2), None);
+        assert_eq!(single.iloc_range(2..1), None);
+        assert_eq!(single.iloc_range(2..=2), None);
+        assert_eq!(single.iloc_range(2..=1), None);
+        assert_eq!(single.iloc_range(..2), None);
+        assert_eq!(single.iloc_range(..=2), None);
+        assert_eq!(single.iloc_range(2..), None);
     }
 
     #[test]
