@@ -27,15 +27,15 @@ impl<'a, L: Label> DoubleEndedIterator for Iter<'a, L> {
     }
 }
 
-pub struct IntoIter<L>(pub(crate) indexmap::set::IntoIter<L>)
-where
-    L: Label,
-;
+impl<'a, L: Label> ExactSizeIterator for Iter<'a, L> {
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+}
 
-impl<L> Iterator for IntoIter<L>
-where
-    L: Label,
-{
+pub struct IntoIter<L: Label>(pub(crate) indexmap::set::IntoIter<L>);
+
+impl<L: Label> Iterator for IntoIter<L> {
     type Item = L;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -47,12 +47,15 @@ where
     }
 }
 
-impl<L> DoubleEndedIterator for IntoIter<L>
-where
-    L: Label,
-{
+impl<L: Label> DoubleEndedIterator for IntoIter<L> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.0.next_back()
+    }
+}
+
+impl<L: Label> ExactSizeIterator for IntoIter<L> {
+    fn len(&self) -> usize {
+        self.0.len()
     }
 }
 
