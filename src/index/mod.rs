@@ -94,6 +94,15 @@ impl<L: Label> Index<L> {
         if idx <= &self.len() { Some(*idx) } else { None }
     }
 
+    /// Returns the position of a given label if it is in this `Index`.
+    pub fn index_of<Q>(&self, lbl: &Q) -> Option<usize>
+    where
+        L: Borrow<Q>,
+        Q: Hash + Eq + ?Sized,
+    {
+        self.0.get_index_of(lbl)
+    }
+
     pub fn iloc(&self, idx: &usize) -> Option<usize> {
         self.valid_index(idx)
     }
@@ -202,12 +211,39 @@ impl<L: Label> Index<L> {
         }
     }
 
+    pub fn by_sel<'a, I, A>(&self, bools: I) -> Option<Vec<&L>>
+    where
+        I: IntoIterator<Item = A>,
+        I::IntoIter: ExactSizeIterator,
+        A: AsRef<bool>,
+    {
+        let bools = bools.into_iter();
+
+        if bools.len() != self.len() { None }
+        else {
+            Some(
+                bools
+                    .zip(self.iter())
+                    .filter_map(|(b, l)| if *b.as_ref() { Some(l) } else { None })
+                    .collect()
+            )
+        }
+    }
+
     pub fn loc<Q>(&self, lbl: &Q) -> Option<usize>
     where
         L: Borrow<Q>,
         Q: Hash + Eq + ?Sized,
     {
         self.0.get_index_of(lbl)
+    }
+
+    pub fn by_loc<Q>(&self, label: &Q) -> Option<&L>
+    where
+        L: Borrow<Q>,
+        Q: Hash + Eq + ?Sized,
+    {
+        self.0.get(label)
     }
 
     pub fn loc_multi<'a, I, Q>(&self, lbls: I) -> Option<Vec<usize>>
@@ -217,6 +253,15 @@ impl<L: Label> Index<L> {
         Q: 'a + Hash + Eq + ?Sized,
     {
         lbls.into_iter().map(|lbl| self.loc(lbl)).collect::<Option<Vec<_>>>()
+    }
+
+    pub fn by_loc_iter<'a, I, Q>(&self, labels: I) -> Option<Vec<&L>>
+    where
+        I: IntoIterator<Item = &'a Q>,
+        L: Borrow<Q>,
+        Q: 'a + Hash + Eq + ?Sized,
+    {
+        labels.into_iter().map(|lbl| self.by_loc(lbl)).collect()
     }
 
     pub fn loc_range<'a, R, Q>(&'a self, range: R) -> Option<Vec<usize>>
@@ -238,6 +283,27 @@ impl<L: Label> Index<L> {
         };
 
         self.iloc_range_owned((start_bound, close_bound))
+    }
+
+    pub fn by_loc_range<'a, R, Q>(&'a self, range: R) -> Option<Vec<&L>>
+    where
+        R: RangeBounds<&'a Q>,
+        L: Borrow<Q>,
+        Q: 'a + Hash + Eq + ?Sized,
+    {
+        let start_bound = match range.start_bound() {
+            Bound::Included(lbl) => Bound::Included(self.loc(lbl)?),
+            Bound::Excluded(lbl) => Bound::Excluded(self.loc(lbl)?),
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        let close_bound = match range.end_bound() {
+            Bound::Included(lbl) => Bound::Included(self.loc(lbl)?),
+            Bound::Excluded(lbl) => Bound::Excluded(self.loc(lbl)?),
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        self.by_pos_range((start_bound, close_bound))
     }
 
     /// Sorts this `Index` in ascending order.
