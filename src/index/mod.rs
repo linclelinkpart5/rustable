@@ -98,6 +98,10 @@ impl<L: Label> Index<L> {
         self.valid_index(idx)
     }
 
+    pub fn by_pos(&self, pos: usize) -> Option<&L> {
+        self.0.get_index(pos)
+    }
+
     pub fn iloc_multi<'a, I>(&'a self, idxs: I) -> Option<Vec<usize>>
     where
         I: IntoIterator<Item = &'a usize>,
@@ -105,6 +109,16 @@ impl<L: Label> Index<L> {
         let mut res = Vec::new();
         for idx in idxs { res.push(self.iloc(idx)?); }
         Some(res)
+    }
+
+    pub fn by_pos_iter<'a, I>(&'a self, pos_iter: I) -> Option<Vec<&'a L>>
+    where
+        I: IntoIterator<Item = &'a usize>,
+    {
+        pos_iter
+            .into_iter()
+            .map(|&p| self.by_pos(p))
+            .collect::<Option<Vec<_>>>()
     }
 
     fn iloc_range_owned<R>(&self, range: R) -> Option<Vec<usize>>
@@ -146,6 +160,28 @@ impl<L: Label> Index<L> {
         };
 
         self.iloc_range_owned((start_bound, close_bound))
+    }
+
+    pub fn by_pos_range<R>(&self, range: R) -> Option<Vec<&L>>
+    where
+        R: RangeBounds<usize>,
+    {
+        // NOTE: Range bounds are always validated, even if range would be empty.
+        let start_nodule = match range.start_bound() {
+            Bound::Included(idx) => self.to_nodule(idx)?,
+            Bound::Excluded(idx) => self.to_nodule(&idx.checked_add(1)?)?,
+            Bound::Unbounded => 0,
+        };
+
+        let close_nodule = match range.end_bound() {
+            Bound::Included(idx) => self.to_nodule(&idx.checked_add(1)?)?,
+            Bound::Excluded(idx) => self.to_nodule(idx)?,
+            Bound::Unbounded => self.len(),
+        };
+
+        (start_nodule..close_nodule)
+            .map(|p| self.by_pos(p))
+            .collect::<Option<Vec<_>>>()
     }
 
     pub fn bloc<'a, I>(&self, bools: I) -> Option<Vec<usize>>
