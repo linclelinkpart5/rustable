@@ -225,6 +225,17 @@ impl<L: Label> Index<L> {
     {
         self.sort_by(|a, b| Ord::cmp(&get_key(a), &get_key(b)))
     }
+
+    /// Sorts this `Index` indirectly by returning the numeric indices in sorted
+    /// ascending order.
+    pub fn arg_sort(&self) -> Vec<usize> {
+        let mut indices = (0..self.len()).collect::<Vec<_>>();
+
+        // Sort this vector of indices, using the original labels as a lookup.
+        indices.sort_by_key(|&i| self.0.get_index(i).unwrap());
+
+        indices
+    }
 }
 
 // Handles loading from `&[0u32, 1, 2]`.
@@ -366,6 +377,37 @@ mod tests {
             String::from("amy"),
             String::from("gus"),
         ]);
+    }
+
+    #[test]
+    fn arg_sort() {
+        use std::collections::HashSet;
+
+        let i = Index::from_vec(vec![9, 5, 3, 8, 6, 0, 1, 2, 7, 4]);
+        let res = i.arg_sort();
+        assert_eq!(res.iter().min(), Some(&0));
+        assert_eq!(res.iter().max(), Some(&(i.len() - 1)));
+        assert_eq!(res.iter().collect::<HashSet<_>>().len(), i.len());
+        assert_eq!(res, vec![5, 6, 7, 2, 9, 1, 4, 8, 3, 0]);
+        // assert_eq!(i.iloc_multi(&res), Some(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]));
+
+        let i = Index::from_vec(vec![
+            String::from("cam"), // 0
+            String::from("ben"), // 1
+            String::from("hal"), // 2
+            String::from("eli"), // 3
+            String::from("ida"), // 4
+            String::from("jim"), // 5
+            String::from("amy"), // 6
+            String::from("dee"), // 7
+            String::from("gus"), // 8
+            String::from("fay"), // 9
+        ]);
+        let res = i.arg_sort();
+        assert_eq!(res.iter().min(), Some(&0));
+        assert_eq!(res.iter().max(), Some(&(i.len() - 1)));
+        assert_eq!(res.iter().collect::<HashSet<_>>().len(), i.len());
+        assert_eq!(res, vec![6, 1, 0, 7, 3, 9, 8, 2, 4, 5]);
     }
 
     #[test]
