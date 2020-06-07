@@ -382,6 +382,8 @@ impl<L: Label> IntoIterator for Index<L> {
 mod tests {
     use super::*;
 
+    use str_macro::str;
+
     #[test]
     fn sort() {
         let mut i = Index::from_vec(vec![9, 5, 3, 8, 6, 0, 1, 2, 7, 4]);
@@ -389,29 +391,29 @@ mod tests {
         assert_eq!(i.into_iter().collect::<Vec<_>>(), vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
         let mut i = Index::from_vec(vec![
-            String::from("cam"),
-            String::from("ben"),
-            String::from("hal"),
-            String::from("eli"),
-            String::from("ida"),
-            String::from("jim"),
-            String::from("amy"),
-            String::from("dee"),
-            String::from("gus"),
-            String::from("fay"),
+            str!("cam"),
+            str!("ben"),
+            str!("hal"),
+            str!("eli"),
+            str!("ida"),
+            str!("jim"),
+            str!("amy"),
+            str!("dee"),
+            str!("gus"),
+            str!("fay"),
         ]);
         i.sort();
         assert_eq!(i.into_iter().collect::<Vec<_>>(), vec![
-            String::from("amy"),
-            String::from("ben"),
-            String::from("cam"),
-            String::from("dee"),
-            String::from("eli"),
-            String::from("fay"),
-            String::from("gus"),
-            String::from("hal"),
-            String::from("ida"),
-            String::from("jim"),
+            str!("amy"),
+            str!("ben"),
+            str!("cam"),
+            str!("dee"),
+            str!("eli"),
+            str!("fay"),
+            str!("gus"),
+            str!("hal"),
+            str!("ida"),
+            str!("jim"),
         ]);
     }
 
@@ -422,29 +424,29 @@ mod tests {
         assert_eq!(i.into_iter().collect::<Vec<_>>(), vec![5, 0, 6, 1, 2, 7, 3, 8, 9, 4]);
 
         let mut i = Index::from_vec(vec![
-            String::from("cam"),
-            String::from("ben"),
-            String::from("hal"),
-            String::from("eli"),
-            String::from("ida"),
-            String::from("jim"),
-            String::from("amy"),
-            String::from("dee"),
-            String::from("gus"),
-            String::from("fay"),
+            str!("cam"),
+            str!("ben"),
+            str!("hal"),
+            str!("eli"),
+            str!("ida"),
+            str!("jim"),
+            str!("amy"),
+            str!("dee"),
+            str!("gus"),
+            str!("fay"),
         ]);
         i.sort_by(|a, b| a.chars().rev().cmp(b.chars().rev()));
         assert_eq!(i.into_iter().collect::<Vec<_>>(), vec![
-            String::from("ida"),
-            String::from("dee"),
-            String::from("eli"),
-            String::from("hal"),
-            String::from("cam"),
-            String::from("jim"),
-            String::from("ben"),
-            String::from("gus"),
-            String::from("fay"),
-            String::from("amy"),
+            str!("ida"),
+            str!("dee"),
+            str!("eli"),
+            str!("hal"),
+            str!("cam"),
+            str!("jim"),
+            str!("ben"),
+            str!("gus"),
+            str!("fay"),
+            str!("amy"),
         ]);
     }
 
@@ -455,29 +457,29 @@ mod tests {
         assert_eq!(i.into_iter().collect::<Vec<_>>(), vec![5, 6, 4, 3, 7, 8, 2, 9, 1, 0]);
 
         let mut i = Index::from_vec(vec![
-            String::from("cam"),
-            String::from("ben"),
-            String::from("hal"),
-            String::from("eli"),
-            String::from("ida"),
-            String::from("jim"),
-            String::from("amy"),
-            String::from("dee"),
-            String::from("gus"),
-            String::from("fay"),
+            str!("cam"),
+            str!("ben"),
+            str!("hal"),
+            str!("eli"),
+            str!("ida"),
+            str!("jim"),
+            str!("amy"),
+            str!("dee"),
+            str!("gus"),
+            str!("fay"),
         ]);
         i.sort_by_key(|s| s.chars().nth(1));
         assert_eq!(i.into_iter().collect::<Vec<_>>(), vec![
-            String::from("cam"),
-            String::from("hal"),
-            String::from("fay"),
-            String::from("ida"),
-            String::from("ben"),
-            String::from("dee"),
-            String::from("jim"),
-            String::from("eli"),
-            String::from("amy"),
-            String::from("gus"),
+            str!("cam"),
+            str!("hal"),
+            str!("fay"),
+            str!("ida"),
+            str!("ben"),
+            str!("dee"),
+            str!("jim"),
+            str!("eli"),
+            str!("amy"),
+            str!("gus"),
         ]);
     }
 
@@ -494,16 +496,16 @@ mod tests {
         assert_eq!(i.by_pos_iter(&res), Some(vec![&0, &1, &2, &3, &4, &5, &6, &7, &8, &9]));
 
         let i = Index::from_vec(vec![
-            String::from("cam"),
-            String::from("ben"),
-            String::from("hal"),
-            String::from("eli"),
-            String::from("ida"),
-            String::from("jim"),
-            String::from("amy"),
-            String::from("dee"),
-            String::from("gus"),
-            String::from("fay"),
+            str!("cam"),
+            str!("ben"),
+            str!("hal"),
+            str!("eli"),
+            str!("ida"),
+            str!("jim"),
+            str!("amy"),
+            str!("dee"),
+            str!("gus"),
+            str!("fay"),
         ]);
         let res = i.arg_sort();
         assert_eq!(res.iter().min(), Some(&0));
@@ -511,16 +513,16 @@ mod tests {
         assert_eq!(res.iter().collect::<HashSet<_>>().len(), i.len());
         assert_eq!(res, vec![6, 1, 0, 7, 3, 9, 8, 2, 4, 5]);
         assert_eq!(i.by_pos_iter(&res), Some(vec![
-            &String::from("amy"),
-            &String::from("ben"),
-            &String::from("cam"),
-            &String::from("dee"),
-            &String::from("eli"),
-            &String::from("fay"),
-            &String::from("gus"),
-            &String::from("hal"),
-            &String::from("ida"),
-            &String::from("jim"),
+            &str!("amy"),
+            &str!("ben"),
+            &str!("cam"),
+            &str!("dee"),
+            &str!("eli"),
+            &str!("fay"),
+            &str!("gus"),
+            &str!("hal"),
+            &str!("ida"),
+            &str!("jim"),
         ]));
     }
 
@@ -654,16 +656,16 @@ mod tests {
         assert_eq!(i.loc_range(&'h'..), i.loc_range(&'h'..=&'a'));
 
         let i: Index<std::string::String> = Index::from_vec(vec![
-            String::from("ab"),
-            String::from("cd"),
-            String::from("ef"),
-            String::from("gh"),
-            String::from("ij"),
-            String::from("kl"),
-            String::from("mn"),
-            String::from("op"),
-            String::from("qr"),
-            String::from("st"),
+            str!("ab"),
+            str!("cd"),
+            str!("ef"),
+            str!("gh"),
+            str!("ij"),
+            str!("kl"),
+            str!("mn"),
+            str!("op"),
+            str!("qr"),
+            str!("st"),
         ]);
 
         assert_eq!(i.loc_range("ef".."op"), Some(vec![2, 3, 4, 5, 6]));
