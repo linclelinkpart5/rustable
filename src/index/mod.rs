@@ -86,25 +86,6 @@ impl<L: Label> Index<L> {
         Union::new(self, other)
     }
 
-    pub fn sort(&mut self) {
-        self.sort_by(Ord::cmp)
-    }
-
-    pub fn sort_by<F>(&mut self, compare: F)
-    where
-        F: FnMut(&L, &L) -> Ordering,
-    {
-        self.0.sort_by(compare)
-    }
-
-    pub fn sort_by_key<F, K>(&mut self, mut get_key: F)
-    where
-        F: FnMut(&L) -> K,
-        K: Ord,
-    {
-        self.sort_by(|a, b| Ord::cmp(&get_key(a), &get_key(b)))
-    }
-
     fn valid_index(&self, idx: &usize) -> Option<usize> {
         if idx < &self.len() { Some(*idx) } else { None }
     }
@@ -221,6 +202,28 @@ impl<L: Label> Index<L> {
         };
 
         self.iloc_range_owned((start_bound, close_bound))
+    }
+
+    /// Sorts this `Index` in ascending order.
+    pub fn sort(&mut self) {
+        self.sort_by(Ord::cmp)
+    }
+
+    /// Sorts this `Index` according to a custom comparator function.
+    pub fn sort_by<F>(&mut self, compare: F)
+    where
+        F: FnMut(&L, &L) -> Ordering,
+    {
+        self.0.sort_by(compare)
+    }
+
+    /// Sorts this `Index` according to a custom key function.
+    pub fn sort_by_key<F, K>(&mut self, mut get_key: F)
+    where
+        F: FnMut(&L) -> K,
+        K: Ord,
+    {
+        self.sort_by(|a, b| Ord::cmp(&get_key(a), &get_key(b)))
     }
 }
 
