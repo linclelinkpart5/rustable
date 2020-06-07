@@ -425,25 +425,37 @@ mod tests {
         assert_eq!(res.iter().max(), Some(&(i.len() - 1)));
         assert_eq!(res.iter().collect::<HashSet<_>>().len(), i.len());
         assert_eq!(res, vec![5, 6, 7, 2, 9, 1, 4, 8, 3, 0]);
-        // assert_eq!(i.iloc_multi(&res), Some(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]));
+        assert_eq!(i.by_pos_iter(&res), Some(vec![&0, &1, &2, &3, &4, &5, &6, &7, &8, &9]));
 
         let i = Index::from_vec(vec![
-            String::from("cam"), // 0
-            String::from("ben"), // 1
-            String::from("hal"), // 2
-            String::from("eli"), // 3
-            String::from("ida"), // 4
-            String::from("jim"), // 5
-            String::from("amy"), // 6
-            String::from("dee"), // 7
-            String::from("gus"), // 8
-            String::from("fay"), // 9
+            String::from("cam"),
+            String::from("ben"),
+            String::from("hal"),
+            String::from("eli"),
+            String::from("ida"),
+            String::from("jim"),
+            String::from("amy"),
+            String::from("dee"),
+            String::from("gus"),
+            String::from("fay"),
         ]);
         let res = i.arg_sort();
         assert_eq!(res.iter().min(), Some(&0));
         assert_eq!(res.iter().max(), Some(&(i.len() - 1)));
         assert_eq!(res.iter().collect::<HashSet<_>>().len(), i.len());
         assert_eq!(res, vec![6, 1, 0, 7, 3, 9, 8, 2, 4, 5]);
+        assert_eq!(i.by_pos_iter(&res), Some(vec![
+            &String::from("amy"),
+            &String::from("ben"),
+            &String::from("cam"),
+            &String::from("dee"),
+            &String::from("eli"),
+            &String::from("fay"),
+            &String::from("gus"),
+            &String::from("hal"),
+            &String::from("ida"),
+            &String::from("jim"),
+        ]));
     }
 
     #[test]
