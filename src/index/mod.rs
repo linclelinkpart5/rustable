@@ -751,16 +751,32 @@ mod tests {
             i.loc_range(&'i'..=&'s'),
         );
         assert_eq!(
+            i.loc_range(..),
+            i.iloc_range(..),
+        );
+        assert_eq!(
             i.loc_range(..&'p'),
             i.loc_range(&'i'..&'p'),
+        );
+        assert_eq!(
+            i.loc_range(..&'p'),
+            i.iloc_range(..7),
         );
         assert_eq!(
             i.loc_range(..=&'p'),
             i.loc_range(&'i'..=&'p'),
         );
         assert_eq!(
+            i.loc_range(..=&'p'),
+            i.iloc_range(..=7),
+        );
+        assert_eq!(
             i.loc_range(&'e'..),
             i.loc_range(&'e'..=&'s'),
+        );
+        assert_eq!(
+            i.loc_range(&'e'..),
+            i.iloc_range(2..),
         );
 
         // Test edge cases.
