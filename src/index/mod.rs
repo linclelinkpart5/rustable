@@ -217,18 +217,45 @@ where
         F: FnMut(&L) -> K,
         K: Ord,
     {
+        // TODO: Replace with `IndexSet::sort_by_key` if/when available.
         self.sort_by(|a, b| Ord::cmp(&get_key(a), &get_key(b)))
+    }
+
+    fn arg_sort_impl<F>(&self, mut compare: F) -> Vec<usize>
+    where
+        F: FnMut(&L, &L) -> Ordering,
+    {
+        let mut indices = (0..self.len()).collect::<Vec<_>>();
+
+        // Sort this vector of indices, using the original labels as a lookup.
+        indices.sort_by(|&a, &b| compare(&self.iloc(a).unwrap(), &self.iloc(b).unwrap()));
+
+        indices
     }
 
     /// Sorts this `Index` indirectly by returning the numeric indices in sorted
     /// ascending order.
     pub fn arg_sort(&self) -> Vec<usize> {
-        let mut indices = (0..self.len()).collect::<Vec<_>>();
+        self.arg_sort_impl(Ord::cmp)
+    }
 
-        // Sort this vector of indices, using the original labels as a lookup.
-        indices.sort_by_key(|&i| self.0.get_index(i).unwrap());
+    /// Sorts this `Index` indirectly by returning the numeric indices in sorted
+    /// ascending order, using a custom comparator function.
+    pub fn arg_sort_by<F>(&self, compare: F) -> Vec<usize>
+    where
+        F: FnMut(&L, &L) -> Ordering,
+    {
+        self.arg_sort_impl(compare)
+    }
 
-        indices
+    /// Sorts this `Index` indirectly by returning the numeric indices in sorted
+    /// ascending order, using a custom key function.
+    pub fn arg_sort_by_key<F, K>(&self, mut get_key: F) -> Vec<usize>
+    where
+        F: FnMut(&L) -> K,
+        K: Ord,
+    {
+        self.arg_sort_impl(|a, b| Ord::cmp(&get_key(a), &get_key(b)))
     }
 }
 
@@ -427,6 +454,92 @@ mod tests {
             &str!("hal"),
             &str!("ida"),
             &str!("jim"),
+        ]));
+    }
+
+    #[test]
+    fn arg_sort_by() {
+        use std::collections::HashSet;
+
+        let i = Index::from_vec(vec![9, 5, 3, 8, 6, 0, 1, 2, 7, 4]);
+        let res = i.arg_sort_by(|a, b| Ord::cmp(&(a % 5), &(b % 5)));
+        assert_eq!(res.iter().min(), Some(&0));
+        assert_eq!(res.iter().max(), Some(&(i.len() - 1)));
+        assert_eq!(res.iter().collect::<HashSet<_>>().len(), i.len());
+        assert_eq!(res, vec![1, 5, 4, 6, 7, 8, 2, 3, 0, 9]);
+        assert_eq!(i.iloc_multi(&res), Some(vec![&5, &0, &6, &1, &2, &7, &3, &8, &9, &4]));
+
+        let i = Index::from_vec(vec![
+            str!("cam"),
+            str!("ben"),
+            str!("hal"),
+            str!("eli"),
+            str!("ida"),
+            str!("jim"),
+            str!("amy"),
+            str!("dee"),
+            str!("gus"),
+            str!("fay"),
+        ]);
+        let res = i.arg_sort_by(|a, b| a.chars().rev().cmp(b.chars().rev()));
+        assert_eq!(res.iter().min(), Some(&0));
+        assert_eq!(res.iter().max(), Some(&(i.len() - 1)));
+        assert_eq!(res.iter().collect::<HashSet<_>>().len(), i.len());
+        assert_eq!(res, vec![4, 7, 3, 2, 0, 5, 1, 8, 9, 6]);
+        assert_eq!(i.iloc_multi(&res), Some(vec![
+            &str!("ida"),
+            &str!("dee"),
+            &str!("eli"),
+            &str!("hal"),
+            &str!("cam"),
+            &str!("jim"),
+            &str!("ben"),
+            &str!("gus"),
+            &str!("fay"),
+            &str!("amy"),
+        ]));
+    }
+
+    #[test]
+    fn arg_sort_by_key() {
+        use std::collections::HashSet;
+
+        let i = Index::from_vec(vec![9, 5, 3, 8, 6, 0, 1, 2, 7, 4]);
+        let res = i.arg_sort_by_key(|i| (5i32 - i).abs());
+        assert_eq!(res.iter().min(), Some(&0));
+        assert_eq!(res.iter().max(), Some(&(i.len() - 1)));
+        assert_eq!(res.iter().collect::<HashSet<_>>().len(), i.len());
+        assert_eq!(res, vec![1, 4, 9, 2, 8, 3, 7, 0, 6, 5]);
+        assert_eq!(i.iloc_multi(&res), Some(vec![&5, &6, &4, &3, &7, &8, &2, &9, &1, &0]));
+
+        let i = Index::from_vec(vec![
+            str!("cam"),
+            str!("ben"),
+            str!("hal"),
+            str!("eli"),
+            str!("ida"),
+            str!("jim"),
+            str!("amy"),
+            str!("dee"),
+            str!("gus"),
+            str!("fay"),
+        ]);
+        let res = i.arg_sort_by_key(|s| s.chars().nth(1));
+        assert_eq!(res.iter().min(), Some(&0));
+        assert_eq!(res.iter().max(), Some(&(i.len() - 1)));
+        assert_eq!(res.iter().collect::<HashSet<_>>().len(), i.len());
+        assert_eq!(res, vec![0, 2, 9, 4, 1, 7, 5, 3, 6, 8]);
+        assert_eq!(i.iloc_multi(&res), Some(vec![
+            &str!("cam"),
+            &str!("hal"),
+            &str!("fay"),
+            &str!("ida"),
+            &str!("ben"),
+            &str!("dee"),
+            &str!("jim"),
+            &str!("eli"),
+            &str!("amy"),
+            &str!("gus"),
         ]));
     }
 
