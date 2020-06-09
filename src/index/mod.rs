@@ -274,6 +274,24 @@ where
     }
 }
 
+impl<L> From<Index<L>> for Vec<L>
+where
+    L: Label,
+{
+    fn from(index: Index<L>) -> Self {
+        index.0.into_iter().collect()
+    }
+}
+
+impl<L> From<Vec<L>> for Index<L>
+where
+    L: Label,
+{
+    fn from(vec: Vec<L>) -> Self {
+        Index::from_vec(vec)
+    }
+}
+
 impl<L> FromIterator<L> for Index<L>
 where
     L: Label,
@@ -319,28 +337,46 @@ mod tests {
 
     use str_macro::str;
     use proptest::prelude::*;
+    use prop::collection::hash_set;
+
+    const MAX_NUM_LABELS: usize = 1000;
 
     // TODO: Figure out how to use `<L: Label>` in proptests.
-    fn arb_index() -> impl Strategy<Value = Index<i32>> {
-        any::<Vec<i32>>().prop_map(|v| Index::from_vec(v))
+    fn _arb_index<L: Label + Arbitrary>() -> impl Strategy<Value = Index<L>> {
+        _arb_labels::<L>().prop_map(|c| Index::from_iter(c))
+    }
+
+    fn arb_index_i32() -> impl Strategy<Value = Index<i32>> {
+        arb_labels_i32().prop_map(|c| Index::from_iter(c))
+    }
+
+    // TODO: Figure out how to use `<L: Label>` in proptests.
+    fn _arb_labels<L: Label + Arbitrary>() -> impl Strategy<Value = Vec<L>> {
+        hash_set(any::<L>(), 0..MAX_NUM_LABELS).prop_map(|m| m.into_iter().collect())
+    }
+
+    fn arb_labels_i32() -> impl Strategy<Value = Vec<i32>> {
+        hash_set(any::<i32>(), 0..MAX_NUM_LABELS).prop_map(|m| m.into_iter().collect())
     }
 
     proptest! {
         #[test]
-        fn reverse_inverts_order(index in arb_index()) {
+        fn reverse_inverts_order(index in arb_index_i32()) {
             let original = index.clone();
             let mut reversed = index;
             reversed.reverse();
 
             // Test that an iterator of the reversed `Index` is pairwise-equal
             // to a reverse iterator of the original `Index`.
+            // This also validates that `reverse` does not modify the length.
+            // TODO: Replace with `==` once implemented.
             assert!(Iterator::eq(reversed.iter(), original.iter().rev()));
         }
     }
 
     proptest! {
         #[test]
-        fn double_reverse_is_identity(index in arb_index()) {
+        fn double_reverse_is_identity(index in arb_index_i32()) {
             let original = index.clone();
             let mut reversed = index;
             reversed.reverse();
@@ -348,7 +384,25 @@ mod tests {
 
             // Test that an iterator of the double-reversed `Index` is
             // pairwise-equal to an iterator of the original `Index`.
+            // TODO: Replace with `==` once implemented.
             assert!(Iterator::eq(reversed.iter(), original.iter()));
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn sort_behaves_like_vec_version(labels in arb_labels_i32()) {
+            // Create a `Vec` version of the `Index`, and sort it with the
+            // stdlib `.sort()` method.
+            let mut expected = labels.clone();
+            expected.sort();
+
+            let mut produced = Index::from(labels);
+            produced.sort();
+
+            // Ensure that `Index::sort()` produces similar results to
+            // `Vec::sort()`.
+            assert!(Iterator::eq(produced.iter(), expected.iter()));
         }
     }
 
