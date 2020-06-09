@@ -14,8 +14,7 @@ rust_decimal = { version = "1.6", optional = true }
 
 [dev-dependencies]
 str-macro = "0.1.4"
-quickcheck = "0.9"
-quickcheck_macros = "0.9"
+proptest = "0.10"
 
 [features]
 
