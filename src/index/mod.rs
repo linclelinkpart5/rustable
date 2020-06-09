@@ -318,6 +318,39 @@ mod tests {
     use super::*;
 
     use str_macro::str;
+    use proptest::prelude::*;
+
+    // TODO: Figure out how to use `<L: Label>` in proptests.
+    fn arb_index() -> impl Strategy<Value = Index<i32>> {
+        any::<Vec<i32>>().prop_map(|v| Index::from_vec(v))
+    }
+
+    proptest! {
+        #[test]
+        fn reverse_inverts_order(index in arb_index()) {
+            let original = index.clone();
+            let mut reversed = index;
+            reversed.reverse();
+
+            // Test that an iterator of the reversed `Index` is pairwise-equal
+            // to a reverse iterator of the original `Index`.
+            assert!(Iterator::eq(reversed.iter(), original.iter().rev()));
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn double_reverse_is_identity(index in arb_index()) {
+            let original = index.clone();
+            let mut reversed = index;
+            reversed.reverse();
+            reversed.reverse();
+
+            // Test that an iterator of the double-reversed `Index` is
+            // pairwise-equal to an iterator of the original `Index`.
+            assert!(Iterator::eq(reversed.iter(), original.iter()));
+        }
+    }
 
     #[test]
     fn reverse() {
