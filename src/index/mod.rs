@@ -9,6 +9,7 @@ use std::ops::Bound;
 use std::ops::RangeBounds;
 
 use indexmap::IndexSet;
+use is_sorted::IsSorted;
 
 use crate::traits::Label;
 use crate::types::DType;
@@ -211,13 +212,12 @@ where
         self.0 = self.0.drain(..).rev().collect()
     }
 
-    /// Sorts the labels of this `Index` in-place.
+    /// Sorts this `Index` in-place using `Ord::cmp`.
     pub fn sort(&mut self) {
         self.sort_by(Ord::cmp)
     }
 
-    /// Sorts the labels of this `Index` in-place according to a custom
-    /// comparator function.
+    /// Sorts this `Index` in-place using a custom comparison function.
     pub fn sort_by<F>(&mut self, compare: F)
     where
         F: FnMut(&L, &L) -> Ordering,
@@ -225,8 +225,7 @@ where
         self.0.sort_by(compare)
     }
 
-    /// Sorts the labels of this `Index` in-place according to a custom key
-    /// function.
+    /// Sorts this `Index` in-place according to a custom key function.
     pub fn sort_by_key<F, K>(&mut self, mut get_key: F)
     where
         F: FnMut(&L) -> K,
@@ -249,13 +248,13 @@ where
     }
 
     /// Sorts this `Index` indirectly by returning the numeric indices in sorted
-    /// ascending order.
+    /// ascending order using `Ord::cmp`.
     pub fn arg_sort(&self) -> Vec<usize> {
         self.arg_sort_impl(Ord::cmp)
     }
 
     /// Sorts this `Index` indirectly by returning the numeric indices in sorted
-    /// ascending order, using a custom comparator function.
+    /// ascending order using a custom comparison function.
     pub fn arg_sort_by<F>(&self, compare: F) -> Vec<usize>
     where
         F: FnMut(&L, &L) -> Ordering,
@@ -264,13 +263,38 @@ where
     }
 
     /// Sorts this `Index` indirectly by returning the numeric indices in sorted
-    /// ascending order, using a custom key function.
+    /// ascending order using a custom key function.
     pub fn arg_sort_by_key<F, K>(&self, mut get_key: F) -> Vec<usize>
     where
         F: FnMut(&L) -> K,
         K: Ord,
     {
         self.arg_sort_impl(|a, b| Ord::cmp(&get_key(a), &get_key(b)))
+    }
+
+    /// Returns `true` if this `Index` is sorted according to `Ord::cmp`.
+    // TODO: Replace with stdlib `Iterator::is_sorted()` once stabilized.
+    pub fn is_sorted(&self) -> bool {
+        IsSorted::is_sorted(&mut self.iter())
+    }
+
+    /// Returns `true` if this `Index` is sorted according to a custom comparison function.
+    // TODO: Replace with stdlib `Iterator::is_sorted_by()` once stabilized.
+    pub fn is_sorted_by<F>(&self, mut compare: F) -> bool
+    where
+        F: FnMut(&L, &L) -> Ordering,
+    {
+        IsSorted::is_sorted_by(&mut self.iter(), |a, b| Some(compare(a, b)))
+    }
+
+    /// Returns `true` if this `Index` is sorted according to a custom key function.
+    // TODO: Replace with stdlib `Iterator::is_sorted_by_key()` once stabilized.
+    pub fn is_sorted_by_key<F, K>(&self, mut get_key: F) -> bool
+    where
+        F: FnMut(&L) -> K,
+        K: Ord,
+    {
+        IsSorted::is_sorted_by_key(&mut self.iter(), |e| get_key(e))
     }
 }
 
