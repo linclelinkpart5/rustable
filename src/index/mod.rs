@@ -38,6 +38,13 @@ where
         Self::from_iter(vec)
     }
 
+    pub fn from_slice(slice: &[L]) -> Self
+    where
+        L: Copy,
+    {
+        Self::from_iter(slice)
+    }
+
     pub fn dtype(&self) -> DType {
         L::dtype()
     }
@@ -198,12 +205,13 @@ where
         self.iloc_range((start_bound, close_bound))
     }
 
-    /// Sorts this `Index` in ascending order.
+    /// Sorts the labels of this `Index` in-place.
     pub fn sort(&mut self) {
         self.sort_by(Ord::cmp)
     }
 
-    /// Sorts this `Index` according to a custom comparator function.
+    /// Sorts the labels of this `Index` in-place according to a custom
+    /// comparator function.
     pub fn sort_by<F>(&mut self, compare: F)
     where
         F: FnMut(&L, &L) -> Ordering,
@@ -211,7 +219,8 @@ where
         self.0.sort_by(compare)
     }
 
-    /// Sorts this `Index` according to a custom key function.
+    /// Sorts the labels of this `Index` in-place according to a custom key
+    /// function.
     pub fn sort_by_key<F, K>(&mut self, mut get_key: F)
     where
         F: FnMut(&L) -> K,
@@ -259,16 +268,6 @@ where
     }
 }
 
-// Handles loading from `&[0u32, 1, 2]`.
-impl<'a, L> Index<L>
-where
-    L: Label + Copy,
-{
-    pub fn from_slice(slice: &[L]) -> Self {
-        Self::from_iter(slice)
-    }
-}
-
 impl<L> FromIterator<L> for Index<L>
 where
     L: Label,
@@ -278,7 +277,6 @@ where
     }
 }
 
-// Handles `Index::from(&[0u32, 1, 2])`.
 impl<'a, L> FromIterator<&'a L> for Index<L>
 where
     L: 'a + Label + Copy
