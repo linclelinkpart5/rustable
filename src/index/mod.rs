@@ -205,6 +205,12 @@ where
         self.iloc_range((start_bound, close_bound))
     }
 
+    /// Reverses the order of the labels in this `Index` in-place.
+    pub fn reverse(&mut self) {
+        // TODO: Replace with `IndexSet::reverse()` once added.
+        self.0 = self.0.drain(..).rev().collect()
+    }
+
     /// Sorts the labels of this `Index` in-place.
     pub fn sort(&mut self) {
         self.sort_by(Ord::cmp)
@@ -312,6 +318,39 @@ mod tests {
     use super::*;
 
     use str_macro::str;
+
+    #[test]
+    fn reverse() {
+        let mut i = Index::from_vec(vec![9, 5, 3, 8, 6, 0, 1, 2, 7, 4]);
+        i.reverse();
+        assert_eq!(i.into_iter().collect::<Vec<_>>(), vec![4, 7, 2, 1, 0, 6, 8, 3, 5, 9]);
+
+        let mut i = Index::from_vec(vec![
+            str!("cam"),
+            str!("ben"),
+            str!("hal"),
+            str!("eli"),
+            str!("ida"),
+            str!("jim"),
+            str!("amy"),
+            str!("dee"),
+            str!("gus"),
+            str!("fay"),
+        ]);
+        i.reverse();
+        assert_eq!(i.into_iter().collect::<Vec<_>>(), vec![
+            str!("fay"),
+            str!("gus"),
+            str!("dee"),
+            str!("amy"),
+            str!("jim"),
+            str!("ida"),
+            str!("eli"),
+            str!("hal"),
+            str!("ben"),
+            str!("cam"),
+        ]);
+    }
 
     #[test]
     fn sort() {
