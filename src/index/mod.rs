@@ -394,246 +394,105 @@ mod tests {
         hash_set(any::<i32>(), 0..MAX_NUM_LABELS).prop_map(|m| m.into_iter().collect())
     }
 
-    // Tests that an a reversed `Index` is pairwise-equal to a reverse iterator
-    // of the original `Index`.
+    // `Index::reverse` should reverse the order of the labels in-place.
     proptest! {
         #[test]
-        fn reverse_inverts_order(index in arb_index_i32()) {
-            let original = index.clone();
-            let mut reversed = index;
-            reversed.reverse();
+        fn reverse_inverts_order(labels in arb_labels_i32()) {
+            let mut expected = labels.clone();
+            expected.reverse();
 
-            assert!(Iterator::eq(reversed.iter(), original.iter().rev()));
+            let mut index = Index::from_vec(labels);
+            index.reverse();
+            let produced: Vec<_> = index.into();
+
+            assert_eq!(produced, expected);
         }
     }
 
-    // Tests that reversing an `Index` twice produces the original `Index`.
+    // Calling `Index::reverse` twice should produce the original `Index`.
     proptest! {
         #[test]
         fn reverse_twice_is_identity(index in arb_index_i32()) {
-            let original = index.clone();
-            let mut reversed = index;
-            reversed.reverse();
-            reversed.reverse();
+            let expected = index.clone();
+            let mut produced = index;
+            produced.reverse();
+            produced.reverse();
 
-            assert_eq!(reversed, original);
+            assert_eq!(produced, expected);
         }
     }
 
-    // Tests that `Index.sort()` yields the same order as `Vec.sort()`.
+    // `Index::sort` should produce the same result as `Index::sort_by` called
+    // with `Ord::cmp`.
     proptest! {
         #[test]
-        fn sort_behaves_like_vec(labels in arb_labels_i32()) {
+        fn sort_as_sort_by(index in arb_index_i32()) {
+            let mut produced = index.clone();
+            let mut expected = index;
+
+            produced.sort();
+            expected.sort_by(Ord::cmp);
+
+            assert_eq!(produced, expected);
+        }
+    }
+
+    // `Index::sort` should produce the same result as `Index::sort_by_key` called
+    // with an identity function.
+    proptest! {
+        #[test]
+        fn sort_as_sort_by_key(index in arb_index_i32()) {
+            let mut produced = index.clone();
+            let mut expected = index;
+
+            produced.sort();
+            expected.sort_by_key(|&l| l);
+
+            assert_eq!(produced, expected);
+        }
+    }
+
+    // `Index::sort` should sort the `Index` in-place.
+    proptest! {
+        #[test]
+        fn sort_orders_labels(labels in arb_labels_i32()) {
             let mut expected = labels.clone();
             expected.sort();
 
-            let mut produced = Index::from(labels);
-            produced.sort();
+            let mut index = Index::from(labels);
+            index.sort();
+            let produced: Vec<_> = index.into();
 
-            assert!(Iterator::eq(produced.iter(), expected.iter()));
+            assert_eq!(produced, expected);
         }
     }
 
-    // Tests that `Index.sort_by()` yields the same order as `Vec.sort_by()`.
+    // `Index::arg_sort` should produce the positions each label would be moved
+    // to if `Index::sort` were to be called.
     proptest! {
         #[test]
-        fn sort_by_behaves_like_vec(
-            labels in arb_labels_i32(),
-            n in (1..=9).prop_filter("cannot be zero", |n| n != &0),
-        )
-        {
-            let comp = |a: &i32, b: &i32| {
-                Ord::cmp(&(a % n), &(b % n))
-            };
-
-            // Create a `Vec` version of the `Index`, and sort it with the
-            // stdlib `.sort_by()` method.
-            let mut expected = labels.clone();
-            expected.sort_by(comp);
-
-            let mut produced = Index::from(labels);
-            produced.sort_by(comp);
-
-            // Ensure that `Index::sort_by()` produces similar results to
-            // `Vec::sort_by()`.
-            assert!(Iterator::eq(produced.iter(), expected.iter()));
-        }
-    }
-
-    // Tests that `Index.sort_by_key()` yields the same order as `Vec.sort_by_key()`.
-    proptest! {
-        #[test]
-        fn sort_by_key_behaves_like_vec(labels in arb_labels_i32(), n: i32) {
-            let key = |i: &i32| {
-                i.wrapping_sub(n).wrapping_abs()
-            };
-
-            // Create a `Vec` version of the `Index`, and sort it with the
-            // stdlib `.sort_by_key()` method.
-            let mut expected = labels.clone();
-            expected.sort_by_key(key);
-
-            let mut produced = Index::from(labels);
-            produced.sort_by_key(key);
-
-            // Ensure that `Index::sort_by_key()` produces similar results to
-            // `Vec::sort_by_key()`.
-            assert!(Iterator::eq(produced.iter(), expected.iter()));
-        }
-    }
-
-    proptest! {
-        #[test]
-        fn arg_sort_yields_sorted_positions(index in arb_index_i32()) {
+        fn arg_sort_produces_sorted_positions(index in arb_index_i32()) {
             let produced = index.arg_sort();
 
-            // Produce pairs of (position, label), sort by label, and extract
-            // the positions.
             let mut pairs = index.into_iter().enumerate().collect::<Vec<_>>();
             pairs.sort_by_key(|&(_, l)| l);
+
             let expected = pairs.into_iter().map(|(i, _)| i).collect::<Vec<_>>();
 
             assert_eq!(produced, expected);
         }
     }
 
+    // The positions produced by `Index::arg_sort` should exactly cover all
+    // values from `0..len()`.
     proptest! {
         #[test]
-        fn arg_sort_yields_complete_positions(index in arb_index_i32()) {
+        fn arg_sort_produces_complete_positions(index in arb_index_i32()) {
             let produced = index.arg_sort().into_iter().collect::<HashSet<_>>();
             let expected = (0usize..index.len()).collect::<HashSet<_>>();
 
             assert_eq!(produced, expected);
         }
-    }
-
-    #[test]
-    fn arg_sort() {
-        use std::collections::HashSet;
-
-        let i = Index::from_vec(vec![9, 5, 3, 8, 6, 0, 1, 2, 7, 4]);
-        let res = i.arg_sort();
-        assert_eq!(res.iter().min(), Some(&0));
-        assert_eq!(res.iter().max(), Some(&(i.len() - 1)));
-        assert_eq!(res.iter().collect::<HashSet<_>>().len(), i.len());
-        assert_eq!(res, vec![5, 6, 7, 2, 9, 1, 4, 8, 3, 0]);
-        assert_eq!(i.iloc_multi(&res), Some(vec![&0, &1, &2, &3, &4, &5, &6, &7, &8, &9]));
-
-        let i = Index::from_vec(vec![
-            str!("cam"),
-            str!("ben"),
-            str!("hal"),
-            str!("eli"),
-            str!("ida"),
-            str!("jim"),
-            str!("amy"),
-            str!("dee"),
-            str!("gus"),
-            str!("fay"),
-        ]);
-        let res = i.arg_sort();
-        assert_eq!(res.iter().min(), Some(&0));
-        assert_eq!(res.iter().max(), Some(&(i.len() - 1)));
-        assert_eq!(res.iter().collect::<HashSet<_>>().len(), i.len());
-        assert_eq!(res, vec![6, 1, 0, 7, 3, 9, 8, 2, 4, 5]);
-        assert_eq!(i.iloc_multi(&res), Some(vec![
-            &str!("amy"),
-            &str!("ben"),
-            &str!("cam"),
-            &str!("dee"),
-            &str!("eli"),
-            &str!("fay"),
-            &str!("gus"),
-            &str!("hal"),
-            &str!("ida"),
-            &str!("jim"),
-        ]));
-    }
-
-    #[test]
-    fn arg_sort_by() {
-        use std::collections::HashSet;
-
-        let i = Index::from_vec(vec![9, 5, 3, 8, 6, 0, 1, 2, 7, 4]);
-        let res = i.arg_sort_by(|a, b| Ord::cmp(&(a % 5), &(b % 5)));
-        assert_eq!(res.iter().min(), Some(&0));
-        assert_eq!(res.iter().max(), Some(&(i.len() - 1)));
-        assert_eq!(res.iter().collect::<HashSet<_>>().len(), i.len());
-        assert_eq!(res, vec![1, 5, 4, 6, 7, 8, 2, 3, 0, 9]);
-        assert_eq!(i.iloc_multi(&res), Some(vec![&5, &0, &6, &1, &2, &7, &3, &8, &9, &4]));
-
-        let i = Index::from_vec(vec![
-            str!("cam"),
-            str!("ben"),
-            str!("hal"),
-            str!("eli"),
-            str!("ida"),
-            str!("jim"),
-            str!("amy"),
-            str!("dee"),
-            str!("gus"),
-            str!("fay"),
-        ]);
-        let res = i.arg_sort_by(|a, b| a.chars().rev().cmp(b.chars().rev()));
-        assert_eq!(res.iter().min(), Some(&0));
-        assert_eq!(res.iter().max(), Some(&(i.len() - 1)));
-        assert_eq!(res.iter().collect::<HashSet<_>>().len(), i.len());
-        assert_eq!(res, vec![4, 7, 3, 2, 0, 5, 1, 8, 9, 6]);
-        assert_eq!(i.iloc_multi(&res), Some(vec![
-            &str!("ida"),
-            &str!("dee"),
-            &str!("eli"),
-            &str!("hal"),
-            &str!("cam"),
-            &str!("jim"),
-            &str!("ben"),
-            &str!("gus"),
-            &str!("fay"),
-            &str!("amy"),
-        ]));
-    }
-
-    #[test]
-    fn arg_sort_by_key() {
-        use std::collections::HashSet;
-
-        let i = Index::from_vec(vec![9, 5, 3, 8, 6, 0, 1, 2, 7, 4]);
-        let res = i.arg_sort_by_key(|i| (5i32 - i).abs());
-        assert_eq!(res.iter().min(), Some(&0));
-        assert_eq!(res.iter().max(), Some(&(i.len() - 1)));
-        assert_eq!(res.iter().collect::<HashSet<_>>().len(), i.len());
-        assert_eq!(res, vec![1, 4, 9, 2, 8, 3, 7, 0, 6, 5]);
-        assert_eq!(i.iloc_multi(&res), Some(vec![&5, &6, &4, &3, &7, &8, &2, &9, &1, &0]));
-
-        let i = Index::from_vec(vec![
-            str!("cam"),
-            str!("ben"),
-            str!("hal"),
-            str!("eli"),
-            str!("ida"),
-            str!("jim"),
-            str!("amy"),
-            str!("dee"),
-            str!("gus"),
-            str!("fay"),
-        ]);
-        let res = i.arg_sort_by_key(|s| s.chars().nth(1));
-        assert_eq!(res.iter().min(), Some(&0));
-        assert_eq!(res.iter().max(), Some(&(i.len() - 1)));
-        assert_eq!(res.iter().collect::<HashSet<_>>().len(), i.len());
-        assert_eq!(res, vec![0, 2, 9, 4, 1, 7, 5, 3, 6, 8]);
-        assert_eq!(i.iloc_multi(&res), Some(vec![
-            &str!("cam"),
-            &str!("hal"),
-            &str!("fay"),
-            &str!("ida"),
-            &str!("ben"),
-            &str!("dee"),
-            &str!("jim"),
-            &str!("eli"),
-            &str!("amy"),
-            &str!("gus"),
-        ]));
     }
 
     #[test]
