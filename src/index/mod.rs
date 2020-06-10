@@ -420,23 +420,21 @@ mod tests {
         }
     }
 
+    // Tests that `Index.sort()` yields the same order as `Vec.sort()`.
     proptest! {
         #[test]
         fn sort_behaves_like_vec(labels in arb_labels_i32()) {
-            // Create a `Vec` version of the `Index`, and sort it with the
-            // stdlib `.sort()` method.
             let mut expected = labels.clone();
             expected.sort();
 
             let mut produced = Index::from(labels);
             produced.sort();
 
-            // Ensure that `Index::sort()` produces similar results to
-            // `Vec::sort()`.
             assert!(Iterator::eq(produced.iter(), expected.iter()));
         }
     }
 
+    // Tests that `Index.sort_by()` yields the same order as `Vec.sort_by()`.
     proptest! {
         #[test]
         fn sort_by_behaves_like_vec(
@@ -462,6 +460,7 @@ mod tests {
         }
     }
 
+    // Tests that `Index.sort_by_key()` yields the same order as `Vec.sort_by_key()`.
     proptest! {
         #[test]
         fn sort_by_key_behaves_like_vec(labels in arb_labels_i32(), n: i32) {
