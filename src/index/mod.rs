@@ -21,7 +21,7 @@ use self::iter::SymDiff;
 use self::iter::Inter;
 use self::iter::Union;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq)]
 pub struct Index<L>(IndexSet<L>)
 where
     L: Label,
@@ -355,6 +355,15 @@ where
     }
 }
 
+impl<L> PartialEq<Index<L>> for Index<L>
+where
+    L: Label,
+{
+    fn eq(&self, other: &Index<L>) -> bool {
+        Iterator::eq(self.iter(), other.iter())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -385,6 +394,8 @@ mod tests {
         hash_set(any::<i32>(), 0..MAX_NUM_LABELS).prop_map(|m| m.into_iter().collect())
     }
 
+    // Tests that an a reversed `Index` is pairwise-equal to a reverse iterator
+    // of the original `Index`.
     proptest! {
         #[test]
         fn reverse_inverts_order(index in arb_index_i32()) {
@@ -392,26 +403,20 @@ mod tests {
             let mut reversed = index;
             reversed.reverse();
 
-            // Test that an iterator of the reversed `Index` is pairwise-equal
-            // to a reverse iterator of the original `Index`.
-            // This also validates that `reverse` does not modify the length.
-            // TODO: Replace with `==` once implemented.
             assert!(Iterator::eq(reversed.iter(), original.iter().rev()));
         }
     }
 
+    // Tests that reversing an `Index` twice produces the original `Index`.
     proptest! {
         #[test]
-        fn double_reverse_is_identity(index in arb_index_i32()) {
+        fn reverse_twice_is_identity(index in arb_index_i32()) {
             let original = index.clone();
             let mut reversed = index;
             reversed.reverse();
             reversed.reverse();
 
-            // Test that an iterator of the double-reversed `Index` is
-            // pairwise-equal to an iterator of the original `Index`.
-            // TODO: Replace with `==` once implemented.
-            assert!(Iterator::eq(reversed.iter(), original.iter()));
+            assert_eq!(reversed, original);
         }
     }
 
