@@ -359,6 +359,8 @@ where
 mod tests {
     use super::*;
 
+    use std::collections::HashSet;
+
     use str_macro::str;
     use proptest::prelude::*;
     use prop::collection::hash_set;
@@ -473,6 +475,31 @@ mod tests {
             // Ensure that `Index::sort_by_key()` produces similar results to
             // `Vec::sort_by_key()`.
             assert!(Iterator::eq(produced.iter(), expected.iter()));
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn arg_sort_yields_sorted_positions(index in arb_index_i32()) {
+            let produced = index.arg_sort();
+
+            // Produce pairs of (position, label), sort by label, and extract
+            // the positions.
+            let mut pairs = index.into_iter().enumerate().collect::<Vec<_>>();
+            pairs.sort_by_key(|&(_, l)| l);
+            let expected = pairs.into_iter().map(|(i, _)| i).collect::<Vec<_>>();
+
+            assert_eq!(produced, expected);
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn arg_sort_yields_complete_positions(index in arb_index_i32()) {
+            let produced = index.arg_sort().into_iter().collect::<HashSet<_>>();
+            let expected = (0usize..index.len()).collect::<HashSet<_>>();
+
+            assert_eq!(produced, expected);
         }
     }
 
