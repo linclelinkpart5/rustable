@@ -415,7 +415,7 @@ mod tests {
 
     proptest! {
         #[test]
-        fn sort_behaves_like_vec_version(labels in arb_labels_i32()) {
+        fn sort_behaves_like_vec(labels in arb_labels_i32()) {
             // Create a `Vec` version of the `Index`, and sort it with the
             // stdlib `.sort()` method.
             let mut expected = labels.clone();
@@ -426,6 +426,52 @@ mod tests {
 
             // Ensure that `Index::sort()` produces similar results to
             // `Vec::sort()`.
+            assert!(Iterator::eq(produced.iter(), expected.iter()));
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn sort_by_behaves_like_vec(
+            labels in arb_labels_i32(),
+            n in (1..=9).prop_filter("cannot be zero", |n| n != &0),
+        )
+        {
+            let comp = |a: &i32, b: &i32| {
+                Ord::cmp(&(a % n), &(b % n))
+            };
+
+            // Create a `Vec` version of the `Index`, and sort it with the
+            // stdlib `.sort_by()` method.
+            let mut expected = labels.clone();
+            expected.sort_by(comp);
+
+            let mut produced = Index::from(labels);
+            produced.sort_by(comp);
+
+            // Ensure that `Index::sort_by()` produces similar results to
+            // `Vec::sort_by()`.
+            assert!(Iterator::eq(produced.iter(), expected.iter()));
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn sort_by_key_behaves_like_vec(labels in arb_labels_i32(), n: i32) {
+            let key = |i: &i32| {
+                i.wrapping_sub(n).wrapping_abs()
+            };
+
+            // Create a `Vec` version of the `Index`, and sort it with the
+            // stdlib `.sort_by_key()` method.
+            let mut expected = labels.clone();
+            expected.sort_by_key(key);
+
+            let mut produced = Index::from(labels);
+            produced.sort_by_key(key);
+
+            // Ensure that `Index::sort_by_key()` produces similar results to
+            // `Vec::sort_by_key()`.
             assert!(Iterator::eq(produced.iter(), expected.iter()));
         }
     }
