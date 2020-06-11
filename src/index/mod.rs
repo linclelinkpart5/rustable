@@ -84,20 +84,36 @@ where
         self.0.contains(label)
     }
 
-    pub fn diff<'a>(&'a self, other: &'a Self) -> Diff<'a, L> {
+    pub fn diff_iter<'a>(&'a self, other: &'a Self) -> Diff<'a, L> {
         Diff::new(self, other)
     }
 
-    pub fn sym_diff<'a>(&'a self, other: &'a Self) -> SymDiff<'a, L> {
+    pub fn sym_diff_iter<'a>(&'a self, other: &'a Self) -> SymDiff<'a, L> {
         SymDiff::new(self, other)
     }
 
-    pub fn inter<'a>(&'a self, other: &'a Self) -> Inter<'a, L> {
+    pub fn inter_iter<'a>(&'a self, other: &'a Self) -> Inter<'a, L> {
         Inter::new(self, other)
     }
 
-    pub fn union<'a>(&'a self, other: &'a Self) -> Union<'a, L> {
+    pub fn union_iter<'a>(&'a self, other: &'a Self) -> Union<'a, L> {
         Union::new(self, other)
+    }
+
+    pub fn diff<'a>(&'a self, other: &'a Self) -> Vec<&'a L> {
+        self.diff_iter(other).collect()
+    }
+
+    pub fn sym_diff<'a>(&'a self, other: &'a Self) -> Vec<&'a L> {
+        self.sym_diff_iter(other).collect()
+    }
+
+    pub fn inter<'a>(&'a self, other: &'a Self) -> Vec<&'a L> {
+        self.inter_iter(other).collect()
+    }
+
+    pub fn union<'a>(&'a self, other: &'a Self) -> Vec<&'a L> {
+        self.union_iter(other).collect()
     }
 
     fn to_nodule(&self, idx: &usize) -> Option<usize> {
