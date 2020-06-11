@@ -495,6 +495,28 @@ mod tests {
         }
     }
 
+    // `Index::iloc` should produce `Some(&L)` if the position is in bounds, and
+    // `None` otherwise.
+    proptest! {
+        #[test]
+        fn iloc_produces_opt_label_ref(
+            (labels, pos) in
+                arb_labels_i32()
+                .prop_flat_map(|l| {
+                    let n = l.len();
+                    (Just(l), 0..(2 * n))
+                })
+        )
+        {
+            let index = Index::from_vec(labels.clone());
+
+            let expected = if pos < index.len() { Some(&labels[pos]) } else { None };
+            let produced = index.iloc(pos);
+
+            assert_eq!(produced, expected);
+        }
+    }
+
     #[test]
     fn iloc() {
         let i = Index::from_iter("ideographs".chars());
