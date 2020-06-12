@@ -66,3 +66,37 @@ impl ArbLabel {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    proptest! {
+        #[test]
+        fn verify_disjoint_pair(
+            (labels_a, labels_b) in ArbLabel::disjoint_pair::<i32>()
+        )
+        {
+            assert!(labels_a.len() <= MAX_LABELS);
+            assert!(labels_b.len() <= MAX_LABELS);
+            assert_eq!(labels_a.len(), labels_b.len());
+            assert!(labels_a.is_disjoint(&labels_b));
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn verify_partial_overlap_pair(
+            (labels_a, labels_b) in ArbLabel::partial_overlap_pair::<i32>()
+        )
+        {
+            assert!(labels_a.len() >= 2);
+            assert!(labels_b.len() >= 2);
+            assert!(labels_a.len() <= MAX_LABELS);
+            assert!(labels_b.len() <= MAX_LABELS);
+            assert_eq!(labels_a.len(), labels_b.len());
+            assert!(!labels_a.is_disjoint(&labels_b));
+            assert_ne!(labels_a, labels_b);
+        }
+    }
+}
