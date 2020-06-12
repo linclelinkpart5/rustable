@@ -469,10 +469,77 @@ mod tests {
         })
     }
 
+    fn arb_overlapping_label_sets_i32() -> impl Strategy<Value = (HashSet<i32>, HashSet<i32>)> {
+        // Generate the desired size of each set as well as the number of
+        // labels to duplicate between them.
+        // Always want at least one label in common, and at least one label that
+        // is one set and not the other.
+        (1..=MAX_NUM_LABELS).prop_flat_map(|len| {
+            (Just(len), 1..len)
+        })
+        // Calculate the total number of unique labels that are needed, and
+        // generate.
+        .prop_flat_map(|(len, inn_len)| {
+            let out_len = len - inn_len;
+
+            let total = (2 * out_len) + inn_len;
+
+            (hash_set(any::<i32>(), total), Just(out_len), Just(inn_len))
+        })
+        // Split out the labels into two sets.
+        .prop_flat_map(|(comb_map, out_len, inn_len)| {
+            let mut iter = comb_map.into_iter();
+
+            let mut a: HashSet<_> = iter.by_ref().take(inn_len).collect();
+            let mut b = a.clone();
+
+            a.extend(iter.by_ref().take(out_len));
+            b.extend(iter);
+
+            (Just(a), Just(b))
+        })
+    }
+
     fn arb_disjoint_indices_i32() -> impl Strategy<Value = (Index<i32>, Index<i32>)> {
         arb_disjoint_label_sets_i32().prop_map(|(ma, mb)| {
             (Index::from_iter(ma), Index::from_iter(mb))
         })
+    }
+
+    fn arb_overlapping_indices_i32() -> impl Strategy<Value = (Index<i32>, Index<i32>)> {
+        arb_overlapping_label_sets_i32().prop_map(|(ma, mb)| {
+            (Index::from_iter(ma), Index::from_iter(mb))
+        })
+    }
+
+    // Meta test for `arb_disjoint_label_sets_i32`.
+    proptest! {
+        #[test]
+        fn verify_arb_disjoint_label_sets_i32(
+            (labels_a, labels_b) in arb_disjoint_label_sets_i32()
+        )
+        {
+            assert!(labels_a.len() <= MAX_NUM_LABELS);
+            assert!(labels_b.len() <= MAX_NUM_LABELS);
+            assert!(labels_a.is_disjoint(&labels_b));
+        }
+    }
+
+    // Meta test for `arb_overlapping_label_sets_i32`.
+    proptest! {
+        #[test]
+        fn verify_arb_overlapping_label_sets_i32(
+            (labels_a, labels_b) in arb_overlapping_label_sets_i32()
+        )
+        {
+            assert!(labels_a.len() >= 1);
+            assert!(labels_b.len() >= 1);
+            assert!(labels_a.len() <= MAX_NUM_LABELS);
+            assert!(labels_b.len() <= MAX_NUM_LABELS);
+            assert_eq!(labels_a.len(), labels_b.len());
+            assert!(!labels_a.is_disjoint(&labels_b));
+            assert_ne!(labels_a, labels_b);
+        }
     }
 
     // `Index::reverse` should reverse the order of the labels in-place.
@@ -614,8 +681,23 @@ mod tests {
     // labels in common.
     proptest! {
         #[test]
-        fn is_disjoint_checks_for_mutual_exclusion((index_a, index_b) in arb_disjoint_indices_i32()) {
+        fn is_disjoint_true_for_disjoint_indices(
+            (index_a, index_b) in arb_disjoint_indices_i32()
+        )
+        {
             assert!(index_a.is_disjoint(&index_b));
+        }
+    }
+
+    // `Index::is_disjoint` should produce `false` if two `Index` objects have one or more
+    // labels in common.
+    proptest! {
+        #[test]
+        fn is_disjoint_false_for_overlapping_indices(
+            (index_a, index_b) in arb_overlapping_indices_i32()
+        )
+        {
+            assert!(!index_a.is_disjoint(&index_b));
         }
     }
 
