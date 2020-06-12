@@ -473,8 +473,8 @@ mod tests {
         // Generate the desired size of each set as well as the number of
         // labels to duplicate between them.
         // Always want at least one label in common, and at least one label that
-        // is one set and not the other.
-        (1..=MAX_NUM_LABELS).prop_flat_map(|len| {
+        // is in one set and not the other.
+        (2..=MAX_NUM_LABELS).prop_flat_map(|len| {
             (Just(len), 1..len)
         })
         // Calculate the total number of unique labels that are needed, and
