@@ -312,6 +312,43 @@ where
     {
         IsSorted::is_sorted_by_key(&mut self.iter(), |e| get_key(e))
     }
+
+    /// Returns `true` if this `Index` has no labels in common with another `Index`.
+    pub fn is_disjoint(&self, other: &Self) -> bool {
+        Inter::new(self, other).next().is_none()
+    }
+
+    fn subset_impl(&self, other: &Self, is_strict: bool) -> bool {
+        let a_len = self.len();
+        let b_len = other.len();
+
+        let len_ok = match is_strict {
+            false => a_len <= b_len,
+            true => a_len < b_len,
+        };
+
+        len_ok && Diff::new(self, other).next().is_none()
+    }
+
+    /// Returns `true` if this `Index` is a subset of another `Index`.
+    pub fn is_subset(&self, other: &Self) -> bool {
+        self.subset_impl(other, false)
+    }
+
+    /// Returns `true` if this `Index` is a strict subset of another `Index`.
+    pub fn is_strict_subset(&self, other: &Self) -> bool {
+        self.subset_impl(other, true)
+    }
+
+    /// Returns `true` if this `Index` is a superset of another `Index`.
+    pub fn is_superset(&self, other: &Self) -> bool {
+        other.is_subset(self)
+    }
+
+    /// Returns `true` if this `Index` is a strict superset of another `Index`.
+    pub fn is_strict_superset(&self, other: &Self) -> bool {
+        other.is_strict_subset(self)
+    }
 }
 
 impl<L> From<Index<L>> for Vec<L>
@@ -386,7 +423,6 @@ mod tests {
 
     use std::collections::HashSet;
 
-    use str_macro::str;
     use proptest::prelude::*;
     use prop::collection::hash_set;
 
@@ -394,20 +430,49 @@ mod tests {
 
     // TODO: Figure out how to use `<L: Label>` in proptests.
     fn _arb_index<L: Label + Arbitrary>() -> impl Strategy<Value = Index<L>> {
-        _arb_labels::<L>().prop_map(|c| Index::from_iter(c))
-    }
-
-    fn arb_index_i32() -> impl Strategy<Value = Index<i32>> {
-        arb_labels_i32().prop_map(|c| Index::from_iter(c))
+        _arb_labels::<L>().prop_map(|v| Index::from_vec(v))
     }
 
     // TODO: Figure out how to use `<L: Label>` in proptests.
     fn _arb_labels<L: Label + Arbitrary>() -> impl Strategy<Value = Vec<L>> {
-        hash_set(any::<L>(), 0..MAX_NUM_LABELS).prop_map(|m| m.into_iter().collect())
+        _arb_unordered_labels().prop_map(|m| m.into_iter().collect())
+    }
+
+    // TODO: Figure out how to use `<L: Label>` in proptests.
+    fn _arb_unordered_labels<L: Label + Arbitrary>() -> impl Strategy<Value = HashSet<L>> {
+        hash_set(any::<L>(), 0..=MAX_NUM_LABELS)
+    }
+
+    fn arb_index_i32() -> impl Strategy<Value = Index<i32>> {
+        arb_labels_i32().prop_map(|v| Index::from_vec(v))
     }
 
     fn arb_labels_i32() -> impl Strategy<Value = Vec<i32>> {
-        hash_set(any::<i32>(), 0..MAX_NUM_LABELS).prop_map(|m| m.into_iter().collect())
+        arb_unordered_labels_i32().prop_map(|m| m.into_iter().collect())
+    }
+
+    fn arb_unordered_labels_i32() -> impl Strategy<Value = HashSet<i32>> {
+        hash_set(any::<i32>(), 0..=MAX_NUM_LABELS)
+    }
+
+    fn arb_disjoint_label_sets_i32() -> impl Strategy<Value = (HashSet<i32>, HashSet<i32>)> {
+        hash_set(any::<i32>(), 0..=(2 * MAX_NUM_LABELS)).prop_map(|m| {
+            let len = m.len();
+            let half = len / 2;
+
+            let mut it = m.into_iter();
+
+            let a = it.by_ref().take(half).collect();
+            let b = it.collect();
+
+            (a, b)
+        })
+    }
+
+    fn arb_disjoint_indices_i32() -> impl Strategy<Value = (Index<i32>, Index<i32>)> {
+        arb_disjoint_label_sets_i32().prop_map(|(ma, mb)| {
+            (Index::from_iter(ma), Index::from_iter(mb))
+        })
     }
 
     // `Index::reverse` should reverse the order of the labels in-place.
@@ -438,8 +503,8 @@ mod tests {
         }
     }
 
-    // `Index::sort` should produce the same result as `Index::sort_by` called
-    // with `Ord::cmp`.
+    // `Index::sort` should produce the same result as `Index::sort_by`
+    // called with `Ord::cmp`.
     proptest! {
         #[test]
         fn sort_as_sort_by(index in arb_index_i32()) {
@@ -453,8 +518,8 @@ mod tests {
         }
     }
 
-    // `Index::sort` should produce the same result as `Index::sort_by_key` called
-    // with an identity function.
+    // `Index::sort` should produce the same result as `Index::sort_by_key`
+    // called with an identity function.
     proptest! {
         #[test]
         fn sort_as_sort_by_key(index in arb_index_i32()) {
@@ -520,7 +585,7 @@ mod tests {
                 arb_labels_i32()
                 .prop_flat_map(|l| {
                     let n = l.len();
-                    (Just(l), 0..(2 * n))
+                    (Just(l), 0..(2 * n + 1))
                 })
         )
         {
@@ -530,6 +595,35 @@ mod tests {
             let produced = index.iloc(pos);
 
             assert_eq!(produced, expected);
+        }
+    }
+
+    // `Index::is_disjoint` should return `true` if one/both of the involved
+    // `Index` objects is/are empty.
+    proptest! {
+        #[test]
+        fn empty_indices_are_always_disjoint(index in arb_index_i32()) {
+            let empty = Index::new();
+
+            assert!(empty.is_disjoint(&index));
+            assert!(index.is_disjoint(&empty));
+        }
+    }
+
+    // `Index::is_disjoint` should produce `true` if two `Index` objects have no
+    // labels in common.
+    proptest! {
+        #[test]
+        fn is_disjoint_checks_for_mutual_exclusion((index_a, index_b) in arb_disjoint_indices_i32()) {
+            assert!(index_a.is_disjoint(&index_b));
+        }
+    }
+
+    // `Index::is_disjoint` should be commutative.
+    proptest! {
+        #[test]
+        fn is_disjoint_is_commutative((index_a, index_b) in (arb_index_i32(), arb_index_i32())) {
+            assert_eq!(index_a.is_disjoint(&index_b), index_b.is_disjoint(&index_a));
         }
     }
 
