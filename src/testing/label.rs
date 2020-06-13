@@ -65,6 +65,29 @@ impl LabelGen {
             })
         })
     }
+
+    pub fn strict_subset_pair<L: Label + Arbitrary>() -> impl Strategy<Value = LabelSetPair<L>> {
+        // Generate the desired size of the larger set as well as the number of
+        // labels to copy into the smaller set.
+        // The larger set should always be a strict superset.
+        (1..=MAX_LABELS).prop_flat_map(|len| {
+            (Just(len), 0..len)
+        })
+        // Calculate the total number of unique labels that are needed, and
+        // generate two sets.
+        .prop_flat_map(|(len, sub_len)| {
+            hash_set(any::<L>(), len).prop_map(move |comb_map| {
+                let mut iter = comb_map.into_iter();
+
+                let a: HashSet<_> = iter.by_ref().take(sub_len).collect();
+                let mut b = a.clone();
+
+                b.extend(iter);
+
+                (a, b)
+            })
+        })
+    }
 }
 
 #[cfg(test)]
@@ -97,6 +120,18 @@ mod tests {
             assert_eq!(labels_a.len(), labels_b.len());
             assert!(!labels_a.is_disjoint(&labels_b));
             assert_ne!(labels_a, labels_b);
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn verify_strict_subset_pair(
+            (labels_a, labels_b) in LabelGen::strict_subset_pair::<i32>()
+        )
+        {
+            assert!(labels_b.len() <= MAX_LABELS);
+            assert!(labels_a.len() < labels_b.len());
+            assert!(HashSet::is_subset(&labels_a, &labels_b));
         }
     }
 }
