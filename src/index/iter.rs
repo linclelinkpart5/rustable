@@ -60,15 +60,15 @@ impl<L: Label> ExactSizeIterator for IntoIter<L> {
 }
 
 /// A lazy iterator producing elements in the difference of `Index`s.
-pub struct Diff<'a, L: Label>(Iter<'a, L>, &'a Index<L>);
+pub struct Difference<'a, L: Label>(Iter<'a, L>, &'a Index<L>);
 
-impl<'a, L: Label> Diff<'a, L> {
+impl<'a, L: Label> Difference<'a, L> {
     pub(crate) fn new(index_a: &'a Index<L>, index_b: &'a Index<L>) -> Self {
         Self(index_a.iter(), index_b)
     }
 }
 
-impl<'a, L: Label> Iterator for Diff<'a, L> {
+impl<'a, L: Label> Iterator for Difference<'a, L> {
     type Item = &'a L;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -85,7 +85,7 @@ impl<'a, L: Label> Iterator for Diff<'a, L> {
     }
 }
 
-impl<'a, L: Label> DoubleEndedIterator for Diff<'a, L> {
+impl<'a, L: Label> DoubleEndedIterator for Difference<'a, L> {
     fn next_back(&mut self) -> Option<Self::Item> {
         while let Some(label) = self.0.next_back() {
             if !self.1.contains(label) {
@@ -97,15 +97,15 @@ impl<'a, L: Label> DoubleEndedIterator for Diff<'a, L> {
 }
 
 /// A lazy iterator producing elements in the symmetric difference of `Index`s.
-pub struct SymDiff<'a, L: Label>(Chain<Diff<'a, L>, Diff<'a, L>>);
+pub struct SymmetricDifference<'a, L: Label>(Chain<Difference<'a, L>, Difference<'a, L>>);
 
-impl<'a, L: Label> SymDiff<'a, L> {
+impl<'a, L: Label> SymmetricDifference<'a, L> {
     pub(crate) fn new(index_a: &'a Index<L>, index_b: &'a Index<L>) -> Self {
-        Self(Diff::new(index_a, index_b).chain(Diff::new(index_b, index_a)))
+        Self(Difference::new(index_a, index_b).chain(Difference::new(index_b, index_a)))
     }
 }
 
-impl<'a, L: Label> Iterator for SymDiff<'a, L> {
+impl<'a, L: Label> Iterator for SymmetricDifference<'a, L> {
     type Item = &'a L;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -117,22 +117,22 @@ impl<'a, L: Label> Iterator for SymDiff<'a, L> {
     }
 }
 
-impl<'a, L: Label> DoubleEndedIterator for SymDiff<'a, L> {
+impl<'a, L: Label> DoubleEndedIterator for SymmetricDifference<'a, L> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.0.next_back()
     }
 }
 
 /// A lazy iterator producing elements in the intersection of `Index`s.
-pub struct Inter<'a, L: Label>(Iter<'a, L>, &'a Index<L>);
+pub struct Intersection<'a, L: Label>(Iter<'a, L>, &'a Index<L>);
 
-impl<'a, L: Label> Inter<'a, L> {
+impl<'a, L: Label> Intersection<'a, L> {
     pub(crate) fn new(index_a: &'a Index<L>, index_b: &'a Index<L>) -> Self {
         Self(index_a.iter(), index_b)
     }
 }
 
-impl<'a, L: Label> Iterator for Inter<'a, L> {
+impl<'a, L: Label> Iterator for Intersection<'a, L> {
     type Item = &'a L;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -149,7 +149,7 @@ impl<'a, L: Label> Iterator for Inter<'a, L> {
     }
 }
 
-impl<'a, L: Label> DoubleEndedIterator for Inter<'a, L> {
+impl<'a, L: Label> DoubleEndedIterator for Intersection<'a, L> {
     fn next_back(&mut self) -> Option<Self::Item> {
         while let Some(label) = self.0.next_back() {
             if self.1.contains(label) {
@@ -161,11 +161,11 @@ impl<'a, L: Label> DoubleEndedIterator for Inter<'a, L> {
 }
 
 /// A lazy iterator producing elements in the union of `Index`s.
-pub struct Union<'a, L: Label>(Chain<Iter<'a, L>, Diff<'a, L>>);
+pub struct Union<'a, L: Label>(Chain<Iter<'a, L>, Difference<'a, L>>);
 
 impl<'a, L: Label> Union<'a, L> {
     pub(crate) fn new(index_a: &'a Index<L>, index_b: &'a Index<L>) -> Self {
-        Self(index_a.iter().chain(Diff::new(index_b, index_a)))
+        Self(index_a.iter().chain(Difference::new(index_b, index_a)))
     }
 }
 

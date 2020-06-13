@@ -16,9 +16,9 @@ use crate::types::DType;
 
 use self::iter::Iter;
 use self::iter::IntoIter;
-use self::iter::Diff;
-use self::iter::SymDiff;
-use self::iter::Inter;
+use self::iter::Difference;
+use self::iter::SymmetricDifference;
+use self::iter::Intersection;
 use self::iter::Union;
 
 #[derive(Debug, Clone, Eq)]
@@ -59,8 +59,6 @@ where
         self.0.insert(key)
     }
 
-    // NOTE: This will always be in "iloc" order, so no need to provide a "full"
-    //       flavor of this method.
     pub fn iter(&self) -> Iter<'_, L> {
         Iter(self.0.iter())
     }
@@ -73,36 +71,20 @@ where
         self.0.contains(label)
     }
 
-    pub fn diff_iter<'a>(&'a self, other: &'a Self) -> Diff<'a, L> {
-        Diff::new(self, other)
+    pub fn difference<'a>(&'a self, other: &'a Self) -> Difference<'a, L> {
+        Difference::new(self, other)
     }
 
-    pub fn sym_diff_iter<'a>(&'a self, other: &'a Self) -> SymDiff<'a, L> {
-        SymDiff::new(self, other)
+    pub fn symmetric_difference<'a>(&'a self, other: &'a Self) -> SymmetricDifference<'a, L> {
+        SymmetricDifference::new(self, other)
     }
 
-    pub fn inter_iter<'a>(&'a self, other: &'a Self) -> Inter<'a, L> {
-        Inter::new(self, other)
+    pub fn intersection<'a>(&'a self, other: &'a Self) -> Intersection<'a, L> {
+        Intersection::new(self, other)
     }
 
-    pub fn union_iter<'a>(&'a self, other: &'a Self) -> Union<'a, L> {
+    pub fn union<'a>(&'a self, other: &'a Self) -> Union<'a, L> {
         Union::new(self, other)
-    }
-
-    pub fn diff<'a>(&'a self, other: &'a Self) -> Vec<&'a L> {
-        self.diff_iter(other).collect()
-    }
-
-    pub fn sym_diff<'a>(&'a self, other: &'a Self) -> Vec<&'a L> {
-        self.sym_diff_iter(other).collect()
-    }
-
-    pub fn inter<'a>(&'a self, other: &'a Self) -> Vec<&'a L> {
-        self.inter_iter(other).collect()
-    }
-
-    pub fn union<'a>(&'a self, other: &'a Self) -> Vec<&'a L> {
-        self.union_iter(other).collect()
     }
 
     fn to_nodule(&self, idx: &usize) -> Option<usize> {
@@ -304,7 +286,7 @@ where
 
     /// Returns `true` if this `Index` has no labels in common with another `Index`.
     pub fn is_disjoint(&self, other: &Self) -> bool {
-        Inter::new(self, other).next().is_none()
+        Intersection::new(self, other).next().is_none()
     }
 
     fn subset_impl(&self, other: &Self, is_strict: bool) -> bool {
@@ -316,7 +298,7 @@ where
             true => a_len < b_len,
         };
 
-        len_ok && Diff::new(self, other).next().is_none()
+        len_ok && Difference::new(self, other).next().is_none()
     }
 
     /// Returns `true` if this `Index` is a subset of another `Index`.
