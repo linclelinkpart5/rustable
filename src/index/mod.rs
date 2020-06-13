@@ -35,17 +35,6 @@ where
         Self::default()
     }
 
-    pub fn from_vec(vec: Vec<L>) -> Self {
-        Self::from_iter(vec)
-    }
-
-    pub fn from_slice(slice: &[L]) -> Self
-    where
-        L: Copy,
-    {
-        Self::from_iter(slice)
-    }
-
     pub fn dtype(&self) -> DType {
         L::dtype()
     }
@@ -365,7 +354,7 @@ where
     L: Label,
 {
     fn from(vec: Vec<L>) -> Self {
-        Index::from_vec(vec)
+        Index::from_iter(vec)
     }
 }
 
@@ -435,7 +424,7 @@ mod tests {
             let mut expected = labels.clone();
             expected.reverse();
 
-            let mut index = Index::from_vec(labels);
+            let mut index = Index::from_iter(labels);
             Index::reverse(&mut index);
             let produced: Vec<_> = index.into();
 
@@ -543,7 +532,7 @@ mod tests {
                 })
         )
         {
-            let index = Index::from_vec(labels.clone());
+            let index = Index::from(labels.clone());
 
             let expected = if pos < index.len() { Some(&labels[pos]) } else { None };
             let produced = Index::iloc(&index, pos);
@@ -777,7 +766,7 @@ mod tests {
         assert_eq!(empty.iloc_range(..=0), None);
         assert_eq!(empty.iloc_range(..), Some(vec![]));
 
-        let single = Index::from_slice(&[10]);
+        let single = Index::from_iter(&[10]);
         assert_eq!(single.iloc_range(0..1), Some(vec![&10]));
         assert_eq!(single.iloc_range(0..=0), Some(vec![&10]));
         assert_eq!(single.iloc_range(0..=1), None);
@@ -979,7 +968,7 @@ mod tests {
         assert_eq!(empty.loc_range(..=&'x'), None);
         assert_eq!(empty.loc_range(..), Some(vec![]));
 
-        let index = Index::from_slice(&[10]);
+        let index = Index::from_iter(&[10]);
         assert_eq!(index.loc_range(&10..&20), None);
         assert_eq!(index.loc_range(&10..=&10), Some(vec![&10]));
         assert_eq!(index.loc_range(&10..=&20), None);
