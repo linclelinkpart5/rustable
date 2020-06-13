@@ -421,136 +421,22 @@ where
 mod tests {
     use super::*;
 
-    use std::collections::HashSet;
+    use crate::testing::label::LabelGen;
+    use crate::testing::index::IndexGen;
 
-    use proptest::prelude::*;
-    use prop::collection::hash_set;
-
-    const MAX_NUM_LABELS: usize = 1000;
-
-    // TODO: Figure out how to use `<L: Label>` in proptests.
-    fn _arb_index<L: Label + Arbitrary>() -> impl Strategy<Value = Index<L>> {
-        _arb_labels::<L>().prop_map(|v| Index::from_vec(v))
-    }
-
-    // TODO: Figure out how to use `<L: Label>` in proptests.
-    fn _arb_labels<L: Label + Arbitrary>() -> impl Strategy<Value = Vec<L>> {
-        _arb_unordered_labels().prop_map(|m| m.into_iter().collect())
-    }
-
-    // TODO: Figure out how to use `<L: Label>` in proptests.
-    fn _arb_unordered_labels<L: Label + Arbitrary>() -> impl Strategy<Value = HashSet<L>> {
-        hash_set(any::<L>(), 0..=MAX_NUM_LABELS)
-    }
-
-    fn arb_index_i32() -> impl Strategy<Value = Index<i32>> {
-        arb_labels_i32().prop_map(|v| Index::from_vec(v))
-    }
-
-    fn arb_labels_i32() -> impl Strategy<Value = Vec<i32>> {
-        arb_unordered_labels_i32().prop_map(|m| m.into_iter().collect())
-    }
-
-    fn arb_unordered_labels_i32() -> impl Strategy<Value = HashSet<i32>> {
-        hash_set(any::<i32>(), 0..=MAX_NUM_LABELS)
-    }
-
-    fn arb_disjoint_label_sets_i32() -> impl Strategy<Value = (HashSet<i32>, HashSet<i32>)> {
-        hash_set(any::<i32>(), 0..=(2 * MAX_NUM_LABELS)).prop_map(|m| {
-            let len = m.len();
-            let half = len / 2;
-
-            let mut it = m.into_iter();
-
-            let a = it.by_ref().take(half).collect();
-            let b = it.collect();
-
-            (a, b)
-        })
-    }
-
-    fn arb_overlapping_label_sets_i32() -> impl Strategy<Value = (HashSet<i32>, HashSet<i32>)> {
-        // Generate the desired size of each set as well as the number of
-        // labels to duplicate between them.
-        // Always want at least one label in common, and at least one label that
-        // is in one set and not the other.
-        (2..=MAX_NUM_LABELS).prop_flat_map(|len| {
-            (Just(len), 1..len)
-        })
-        // Calculate the total number of unique labels that are needed, and
-        // generate.
-        .prop_flat_map(|(len, inn_len)| {
-            let out_len = len - inn_len;
-
-            let total = (2 * out_len) + inn_len;
-
-            (hash_set(any::<i32>(), total), Just(out_len), Just(inn_len))
-        })
-        // Split out the labels into two sets.
-        .prop_flat_map(|(comb_map, out_len, inn_len)| {
-            let mut iter = comb_map.into_iter();
-
-            let mut a: HashSet<_> = iter.by_ref().take(inn_len).collect();
-            let mut b = a.clone();
-
-            a.extend(iter.by_ref().take(out_len));
-            b.extend(iter);
-
-            (Just(a), Just(b))
-        })
-    }
-
-    fn arb_disjoint_indices_i32() -> impl Strategy<Value = (Index<i32>, Index<i32>)> {
-        arb_disjoint_label_sets_i32().prop_map(|(ma, mb)| {
-            (Index::from_iter(ma), Index::from_iter(mb))
-        })
-    }
-
-    fn arb_overlapping_indices_i32() -> impl Strategy<Value = (Index<i32>, Index<i32>)> {
-        arb_overlapping_label_sets_i32().prop_map(|(ma, mb)| {
-            (Index::from_iter(ma), Index::from_iter(mb))
-        })
-    }
-
-    // Meta test for `arb_disjoint_label_sets_i32`.
-    proptest! {
-        #[test]
-        fn verify_arb_disjoint_label_sets_i32(
-            (labels_a, labels_b) in arb_disjoint_label_sets_i32()
-        )
-        {
-            assert!(labels_a.len() <= MAX_NUM_LABELS);
-            assert!(labels_b.len() <= MAX_NUM_LABELS);
-            assert!(labels_a.is_disjoint(&labels_b));
-        }
-    }
-
-    // Meta test for `arb_overlapping_label_sets_i32`.
-    proptest! {
-        #[test]
-        fn verify_arb_overlapping_label_sets_i32(
-            (labels_a, labels_b) in arb_overlapping_label_sets_i32()
-        )
-        {
-            assert!(labels_a.len() >= 1);
-            assert!(labels_b.len() >= 1);
-            assert!(labels_a.len() <= MAX_NUM_LABELS);
-            assert!(labels_b.len() <= MAX_NUM_LABELS);
-            assert_eq!(labels_a.len(), labels_b.len());
-            assert!(!labels_a.is_disjoint(&labels_b));
-            assert_ne!(labels_a, labels_b);
-        }
-    }
+    use proptest::prelude::proptest;
+    use proptest::strategy::Just;
+    use proptest::strategy::Strategy;
 
     // `Index::reverse` should reverse the order of the labels in-place.
     proptest! {
         #[test]
-        fn reverse_inverts_order(labels in arb_labels_i32()) {
+        fn reverse_inverts_order(labels in LabelGen::ordered::<i32>()) {
             let mut expected = labels.clone();
             expected.reverse();
 
             let mut index = Index::from_vec(labels);
-            index.reverse();
+            Index::reverse(&mut index);
             let produced: Vec<_> = index.into();
 
             assert_eq!(produced, expected);
@@ -560,11 +446,11 @@ mod tests {
     // Calling `Index::reverse` twice should produce the original `Index`.
     proptest! {
         #[test]
-        fn reverse_twice_is_identity(index in arb_index_i32()) {
+        fn reverse_twice_is_identity(index in IndexGen::index::<i32>()) {
             let expected = index.clone();
             let mut produced = index;
-            produced.reverse();
-            produced.reverse();
+            Index::reverse(&mut produced);
+            Index::reverse(&mut produced);
 
             assert_eq!(produced, expected);
         }
@@ -574,12 +460,12 @@ mod tests {
     // called with `Ord::cmp`.
     proptest! {
         #[test]
-        fn sort_as_sort_by(index in arb_index_i32()) {
+        fn sort_as_sort_by(index in IndexGen::index::<i32>()) {
             let mut produced = index.clone();
             let mut expected = index;
 
-            produced.sort();
-            expected.sort_by(Ord::cmp);
+            Index::sort(&mut produced);
+            Index::sort_by(&mut expected, Ord::cmp);
 
             assert_eq!(produced, expected);
         }
@@ -589,12 +475,12 @@ mod tests {
     // called with an identity function.
     proptest! {
         #[test]
-        fn sort_as_sort_by_key(index in arb_index_i32()) {
+        fn sort_as_sort_by_key(index in IndexGen::index::<i32>()) {
             let mut produced = index.clone();
             let mut expected = index;
 
-            produced.sort();
-            expected.sort_by_key(|&l| l);
+            Index::sort(&mut produced);
+            Index::sort_by_key(&mut expected, |&l| l);
 
             assert_eq!(produced, expected);
         }
@@ -603,12 +489,12 @@ mod tests {
     // `Index::sort` should sort the `Index` in-place.
     proptest! {
         #[test]
-        fn sort_orders_labels(labels in arb_labels_i32()) {
+        fn sort_orders_labels(labels in LabelGen::ordered::<i32>()) {
             let mut expected = labels.clone();
             expected.sort();
 
             let mut index = Index::from(labels);
-            index.sort();
+            Index::sort(&mut index);
             let produced: Vec<_> = index.into();
 
             assert_eq!(produced, expected);
@@ -619,8 +505,8 @@ mod tests {
     // to if `Index::sort` were to be called.
     proptest! {
         #[test]
-        fn arg_sort_produces_sorted_positions(index in arb_index_i32()) {
-            let produced = index.arg_sort();
+        fn arg_sort_produces_sorted_positions(index in IndexGen::index::<i32>()) {
+            let produced = Index::arg_sort(&index);
 
             let mut pairs = index.into_iter().enumerate().collect::<Vec<_>>();
             pairs.sort_by_key(|&(_, l)| l);
@@ -632,12 +518,13 @@ mod tests {
     }
 
     // The positions produced by `Index::arg_sort` should exactly cover all
-    // values from `0..len()`.
+    // values from `0..len()` with no holes or duplicates.
     proptest! {
         #[test]
-        fn arg_sort_produces_complete_positions(index in arb_index_i32()) {
-            let produced = index.arg_sort().into_iter().collect::<HashSet<_>>();
-            let expected = (0usize..index.len()).collect::<HashSet<_>>();
+        fn arg_sort_produces_complete_positions(index in IndexGen::index::<i32>()) {
+            let mut produced = Index::arg_sort(&index);
+            produced.sort();
+            let expected = (0usize..index.len()).collect::<Vec<_>>();
 
             assert_eq!(produced, expected);
         }
@@ -649,7 +536,7 @@ mod tests {
         #[test]
         fn iloc_produces_opt_label_ref(
             (labels, pos) in
-                arb_labels_i32()
+                LabelGen::ordered::<i32>()
                 .prop_flat_map(|l| {
                     let n = l.len();
                     (Just(l), 0..(2 * n + 1))
@@ -659,7 +546,7 @@ mod tests {
             let index = Index::from_vec(labels.clone());
 
             let expected = if pos < index.len() { Some(&labels[pos]) } else { None };
-            let produced = index.iloc(pos);
+            let produced = Index::iloc(&index, pos);
 
             assert_eq!(produced, expected);
         }
@@ -669,11 +556,11 @@ mod tests {
     // `Index` objects is/are empty.
     proptest! {
         #[test]
-        fn empty_indices_are_always_disjoint(index in arb_index_i32()) {
+        fn empty_indices_are_always_disjoint(index in IndexGen::index::<i32>()) {
             let empty = Index::new();
 
-            assert!(empty.is_disjoint(&index));
-            assert!(index.is_disjoint(&empty));
+            assert!(Index::is_disjoint(&empty, &index));
+            assert!(Index::is_disjoint(&index, &empty));
         }
     }
 
@@ -682,10 +569,10 @@ mod tests {
     proptest! {
         #[test]
         fn is_disjoint_true_for_disjoint_indices(
-            (index_a, index_b) in arb_disjoint_indices_i32()
+            (index_a, index_b) in IndexGen::disjoint_pair::<i32>()
         )
         {
-            assert!(index_a.is_disjoint(&index_b));
+            assert!(Index::is_disjoint(&index_a, &index_b));
         }
     }
 
@@ -694,18 +581,24 @@ mod tests {
     proptest! {
         #[test]
         fn is_disjoint_false_for_overlapping_indices(
-            (index_a, index_b) in arb_overlapping_indices_i32()
+            (index_a, index_b) in IndexGen::partial_overlap_pair::<i32>()
         )
         {
-            assert!(!index_a.is_disjoint(&index_b));
+            assert!(!Index::is_disjoint(&index_a, &index_b));
         }
     }
 
     // `Index::is_disjoint` should be commutative.
     proptest! {
         #[test]
-        fn is_disjoint_is_commutative((index_a, index_b) in (arb_index_i32(), arb_index_i32())) {
-            assert_eq!(index_a.is_disjoint(&index_b), index_b.is_disjoint(&index_a));
+        fn is_disjoint_is_commutative(
+            (index_a, index_b) in (IndexGen::index::<i32>(), IndexGen::index::<i32>())
+        )
+        {
+            assert_eq!(
+                Index::is_disjoint(&index_a, &index_b),
+                Index::is_disjoint(&index_b, &index_a),
+            );
         }
     }
 

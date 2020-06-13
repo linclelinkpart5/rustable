@@ -9,20 +9,20 @@ use crate::traits::Label;
 
 pub const MAX_LABELS: usize = 2000;
 
-pub type SetPair<L> = (HashSet<L>, HashSet<L>);
+pub type LabelSetPair<L> = (HashSet<L>, HashSet<L>);
 
-pub struct ArbLabel;
+pub struct LabelGen;
 
-impl ArbLabel {
-    fn unordered<L: Label + Arbitrary>() -> impl Strategy<Value = HashSet<L>> {
+impl LabelGen {
+    pub fn unordered<L: Label + Arbitrary>() -> impl Strategy<Value = HashSet<L>> {
         hash_set(any::<L>(), 0..=MAX_LABELS)
     }
 
-    fn ordered<L: Label + Arbitrary>() -> impl Strategy<Value = Vec<L>> {
+    pub fn ordered<L: Label + Arbitrary>() -> impl Strategy<Value = Vec<L>> {
         Self::unordered().prop_map(|m| Vec::from_iter(m))
     }
 
-    fn disjoint_pair<L: Label + Arbitrary>() -> impl Strategy<Value = SetPair<L>> {
+    pub fn disjoint_pair<L: Label + Arbitrary>() -> impl Strategy<Value = LabelSetPair<L>> {
         (0..=MAX_LABELS).prop_flat_map(|len| {
             let tot_len = 2 * len;
 
@@ -37,7 +37,7 @@ impl ArbLabel {
         })
     }
 
-    fn partial_overlap_pair<L: Label + Arbitrary>() -> impl Strategy<Value = SetPair<L>> {
+    pub fn partial_overlap_pair<L: Label + Arbitrary>() -> impl Strategy<Value = LabelSetPair<L>> {
         // Generate the desired size of each set as well as the number of
         // labels to duplicate between them.
         // Always want at least one label in common, and at least one label that
@@ -74,7 +74,7 @@ mod tests {
     proptest! {
         #[test]
         fn verify_disjoint_pair(
-            (labels_a, labels_b) in ArbLabel::disjoint_pair::<i32>()
+            (labels_a, labels_b) in LabelGen::disjoint_pair::<i32>()
         )
         {
             assert!(labels_a.len() <= MAX_LABELS);
@@ -87,7 +87,7 @@ mod tests {
     proptest! {
         #[test]
         fn verify_partial_overlap_pair(
-            (labels_a, labels_b) in ArbLabel::partial_overlap_pair::<i32>()
+            (labels_a, labels_b) in LabelGen::partial_overlap_pair::<i32>()
         )
         {
             assert!(labels_a.len() >= 2);
