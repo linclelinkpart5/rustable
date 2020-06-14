@@ -14,15 +14,24 @@ pub type LabelSetPair<L> = (HashSet<L>, HashSet<L>);
 pub struct LabelGen;
 
 impl LabelGen {
-    pub fn unordered<L: Label + Arbitrary>() -> impl Strategy<Value = HashSet<L>> {
+    pub fn unordered<L>() -> impl Strategy<Value = HashSet<L>>
+    where
+        L: Label + Arbitrary,
+    {
         hash_set(any::<L>(), 0..=MAX_LABELS)
     }
 
-    pub fn ordered<L: Label + Arbitrary>() -> impl Strategy<Value = Vec<L>> {
+    pub fn ordered<L>() -> impl Strategy<Value = Vec<L>>
+    where
+        L: Label + Arbitrary,
+    {
         Self::unordered().prop_map(|m| Vec::from_iter(m))
     }
 
-    pub fn disjoint_pair<L: Label + Arbitrary>() -> impl Strategy<Value = LabelSetPair<L>> {
+    pub fn disjoint_pair<L>() -> impl Strategy<Value = LabelSetPair<L>>
+    where
+        L: Label + Arbitrary,
+    {
         (0..=MAX_LABELS).prop_flat_map(|len| {
             let tot_len = 2 * len;
 
@@ -37,7 +46,10 @@ impl LabelGen {
         })
     }
 
-    pub fn non_disjoint_pair<L: Label + Arbitrary>() -> impl Strategy<Value = LabelSetPair<L>> {
+    pub fn non_disjoint_pair<L>() -> impl Strategy<Value = LabelSetPair<L>>
+    where
+        L: Label + Arbitrary,
+    {
         // Generate the desired size of each set, as well as the number of
         // labels to have in common between them.
         // NOTE: The minimum size is 1, since empty sets are always disjoint.
@@ -65,27 +77,38 @@ impl LabelGen {
         })
     }
 
-    pub fn strict_subset_pair<L: Label + Arbitrary>() -> impl Strategy<Value = LabelSetPair<L>> {
-        // Generate the desired size of the larger set as well as the number of
-        // labels to copy into the smaller set.
-        // The larger set should always be a strict superset.
-        (1..=MAX_LABELS).prop_flat_map(|len| {
-            (Just(len), 0..len)
+    fn subset_pair_impl<L>(strict: bool) -> impl Strategy<Value = LabelSetPair<L>>
+    where
+        L: Label + Arbitrary,
+    {
+        let start = if strict { 1 } else { 0 };
+
+        (start..=MAX_LABELS).prop_flat_map(move |len| {
+            let min_to_remove = if strict { 1 } else { 0 };
+
+            (Just(len), min_to_remove..=len)
         })
-        // Calculate the total number of unique labels that are needed, and
-        // generate two sets.
-        .prop_flat_map(|(len, sub_len)| {
-            hash_set(any::<L>(), len).prop_map(move |comb_map| {
-                let mut iter = comb_map.into_iter();
+        .prop_flat_map(|(len, num_to_remove)| {
+            hash_set(any::<L>(), len).prop_map(move |superset| {
+                let subset = superset.iter().skip(num_to_remove).cloned().collect();
 
-                let a: HashSet<_> = iter.by_ref().take(sub_len).collect();
-                let mut b = a.clone();
-
-                b.extend(iter);
-
-                (a, b)
+                (subset, superset)
             })
         })
+    }
+
+    pub fn subset_pair<L>() -> impl Strategy<Value = LabelSetPair<L>>
+    where
+        L: Label + Arbitrary,
+    {
+        Self::subset_pair_impl::<L>(false)
+    }
+
+    pub fn strict_subset_pair<L>() -> impl Strategy<Value = LabelSetPair<L>>
+    where
+        L: Label + Arbitrary,
+    {
+        Self::subset_pair_impl::<L>(true)
     }
 }
 
@@ -118,6 +141,18 @@ mod tests {
             assert!(labels_b.len() <= MAX_LABELS);
             assert_eq!(labels_a.len(), labels_b.len());
             assert!(!labels_a.is_disjoint(&labels_b));
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn verify_subset_pair(
+            (labels_a, labels_b) in LabelGen::subset_pair::<i32>()
+        )
+        {
+            assert!(labels_b.len() <= MAX_LABELS);
+            assert!(labels_a.len() <= labels_b.len());
+            assert!(labels_a.is_subset(&labels_b));
         }
     }
 
