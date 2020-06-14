@@ -27,4 +27,10 @@ impl IndexGen {
             (Index::from_iter(a), Index::from_iter(b))
         })
     }
+
+    pub fn strict_subset_pair<L: Label + Arbitrary>() -> impl Strategy<Value = IndexPair<L>> {
+        LabelGen::strict_subset_pair().prop_map(|(a, b)| {
+            (Index::from_iter(a), Index::from_iter(b))
+        })
+    }
 }

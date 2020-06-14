@@ -131,7 +131,7 @@ mod tests {
         {
             assert!(labels_b.len() <= MAX_LABELS);
             assert!(labels_a.len() < labels_b.len());
-            assert!(HashSet::is_subset(&labels_a, &labels_b));
+            assert!(labels_a.is_subset(&labels_b));
         }
     }
 }
