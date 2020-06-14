@@ -523,6 +523,30 @@ mod tests {
         }
     }
 
+    // `Index::is_disjoint` should produce `true` if two `Index` objects have
+    // no labels in common.
+    proptest! {
+        #[test]
+        fn is_disjoint_true_for_disjoint_indices(
+            (index_a, index_b) in IndexGen::disjoint_pair::<i32>()
+        )
+        {
+            assert!(Index::is_disjoint(&index_a, &index_b));
+        }
+    }
+
+    // `Index::is_disjoint` should produce `false` if two `Index` objects have
+    // one or more labels in common.
+    proptest! {
+        #[test]
+        fn is_disjoint_false_for_non_disjoint_indices(
+            (index_a, index_b) in IndexGen::non_disjoint_pair::<i32>()
+        )
+        {
+            assert!(!Index::is_disjoint(&index_a, &index_b));
+        }
+    }
+
     // `Index::is_disjoint` should return `true` if one/both of the involved
     // `Index` objects is/are empty.
     proptest! {
@@ -535,34 +559,10 @@ mod tests {
         }
     }
 
-    // `Index::is_disjoint` should produce `true` if two `Index` objects have no
-    // labels in common.
+    // `Index::is_disjoint` should be symmetric.
     proptest! {
         #[test]
-        fn is_disjoint_true_for_disjoint_indices(
-            (index_a, index_b) in IndexGen::disjoint_pair::<i32>()
-        )
-        {
-            assert!(Index::is_disjoint(&index_a, &index_b));
-        }
-    }
-
-    // `Index::is_disjoint` should produce `false` if two `Index` objects have one or more
-    // labels in common.
-    proptest! {
-        #[test]
-        fn is_disjoint_false_for_overlapping_indices(
-            (index_a, index_b) in IndexGen::partial_overlap_pair::<i32>()
-        )
-        {
-            assert!(!Index::is_disjoint(&index_a, &index_b));
-        }
-    }
-
-    // `Index::is_disjoint` should be commutative.
-    proptest! {
-        #[test]
-        fn is_disjoint_is_commutative(
+        fn is_disjoint_is_symmetric(
             (index_a, index_b) in (IndexGen::index::<i32>(), IndexGen::index::<i32>())
         )
         {

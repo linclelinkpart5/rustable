@@ -22,8 +22,8 @@ impl IndexGen {
         })
     }
 
-    pub fn partial_overlap_pair<L: Label + Arbitrary>() -> impl Strategy<Value = IndexPair<L>> {
-        LabelGen::partial_overlap_pair().prop_map(|(a, b)| {
+    pub fn non_disjoint_pair<L: Label + Arbitrary>() -> impl Strategy<Value = IndexPair<L>> {
+        LabelGen::non_disjoint_pair().prop_map(|(a, b)| {
             (Index::from_iter(a), Index::from_iter(b))
         })
     }

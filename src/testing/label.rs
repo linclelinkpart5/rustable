@@ -37,28 +37,27 @@ impl LabelGen {
         })
     }
 
-    pub fn partial_overlap_pair<L: Label + Arbitrary>() -> impl Strategy<Value = LabelSetPair<L>> {
-        // Generate the desired size of each set as well as the number of
-        // labels to duplicate between them.
-        // Always want at least one label in common, and at least one label that
-        // is in one set and not the other, so each set has a minimum size of 2.
-        (2..=MAX_LABELS).prop_flat_map(|len| {
-            (Just(len), 1..len)
+    pub fn non_disjoint_pair<L: Label + Arbitrary>() -> impl Strategy<Value = LabelSetPair<L>> {
+        // Generate the desired size of each set, as well as the number of
+        // labels to have in common between them.
+        // NOTE: The minimum size is 1, since empty sets are always disjoint.
+        (1..=MAX_LABELS).prop_flat_map(|len| {
+            (Just(len), 1..=len)
         })
-        // Calculate the total number of unique labels that are needed, and
-        // generate two sets.
-        .prop_flat_map(|(len, inn_len)| {
-            let out_len = len - inn_len;
+        .prop_flat_map(|(len, inner_len)| {
+            let outer_len = len - inner_len;
+            let total_len = (2 * outer_len) + inner_len;
 
-            let total = (2 * out_len) + inn_len;
+            hash_set(any::<L>(), total_len).prop_map(move |label_pool| {
+                let mut iter = label_pool.into_iter();
 
-            hash_set(any::<L>(), total).prop_map(move |comb_map| {
-                let mut iter = comb_map.into_iter();
-
-                let mut a: HashSet<_> = iter.by_ref().take(inn_len).collect();
+                // Take the desired number of common labels, then clone the set.
+                let mut a: HashSet<_> = iter.by_ref().take(inner_len).collect();
                 let mut b = a.clone();
 
-                a.extend(iter.by_ref().take(out_len));
+                // There should be exactly enough labels to add to each set to
+                // make each one the target length.
+                a.extend(iter.by_ref().take(outer_len));
                 b.extend(iter);
 
                 (a, b)
@@ -109,17 +108,16 @@ mod tests {
 
     proptest! {
         #[test]
-        fn verify_partial_overlap_pair(
-            (labels_a, labels_b) in LabelGen::partial_overlap_pair::<i32>()
+        fn verify_non_disjoint_pair(
+            (labels_a, labels_b) in LabelGen::non_disjoint_pair::<i32>()
         )
         {
-            assert!(labels_a.len() >= 2);
-            assert!(labels_b.len() >= 2);
+            assert!(labels_a.len() >= 1);
+            assert!(labels_b.len() >= 1);
             assert!(labels_a.len() <= MAX_LABELS);
             assert!(labels_b.len() <= MAX_LABELS);
             assert_eq!(labels_a.len(), labels_b.len());
             assert!(!labels_a.is_disjoint(&labels_b));
-            assert_ne!(labels_a, labels_b);
         }
     }
 
