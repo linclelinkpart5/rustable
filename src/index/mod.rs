@@ -569,8 +569,8 @@ mod tests {
         }
     }
 
-    // `Index::is_subset` should return `true` for two `Index` objects if all of
-    // the labels in the first `Index` are contained in the second.
+    // `Index::is_subset` should return `true` for two `Index` objects if
+    // all of the labels in the first `Index` are contained in the second.
     proptest! {
         #[test]
         fn is_subset_tests_inclusion(
