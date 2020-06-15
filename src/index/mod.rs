@@ -523,39 +523,34 @@ mod tests {
         }
     }
 
-    // `Index::is_disjoint` should produce `true` if two `Index` objects have
-    // no labels in common.
+    // `Index::is_disjoint` should return `true` if two `Index` objects if there
+    // are any labels in common between them, and `false` otherwise.
     proptest! {
         #[test]
-        fn is_disjoint_true_for_disjoint_indices(
-            (index_a, index_b) in IndexGen::disjoint_pair::<i32>()
+        fn is_disjoint_tests_mutual_exclusivity(
+            labels_a in LabelGen::unordered::<i32>(),
+            labels_b in LabelGen::unordered::<i32>(),
         )
         {
-            assert!(Index::is_disjoint(&index_a, &index_b));
+            let expected = labels_a.is_disjoint(&labels_b);
+
+            let index_a = Index::from_iter(labels_a);
+            let index_b = Index::from_iter(labels_b);
+
+            let produced = Index::is_disjoint(&index_a, &index_b);
+
+            assert_eq!(produced, expected);
         }
     }
 
-    // `Index::is_disjoint` should produce `false` if two `Index` objects have
-    // one or more labels in common.
+    // Empty `Index` objects should be disjoint with any other `Index` object,
+    // including themselves.
     proptest! {
         #[test]
-        fn is_disjoint_false_for_non_disjoint_indices(
-            (index_a, index_b) in IndexGen::non_disjoint_pair::<i32>()
-        )
-        {
-            assert!(!Index::is_disjoint(&index_a, &index_b));
-        }
-    }
-
-    // `Index::is_disjoint` should return `true` if one/both of the involved
-    // `Index` objects is/are empty.
-    proptest! {
-        #[test]
-        fn empty_indices_are_always_disjoint(index in IndexGen::index::<i32>()) {
+        fn empty_index_always_disjoint(index in IndexGen::index::<i32>()) {
             let empty = Index::new();
 
             assert!(Index::is_disjoint(&empty, &index));
-            assert!(Index::is_disjoint(&index, &empty));
         }
     }
 
@@ -563,7 +558,8 @@ mod tests {
     proptest! {
         #[test]
         fn is_disjoint_is_symmetric(
-            (index_a, index_b) in (IndexGen::index::<i32>(), IndexGen::index::<i32>())
+            index_a in IndexGen::index::<i32>(),
+            index_b in IndexGen::index::<i32>(),
         )
         {
             assert_eq!(
