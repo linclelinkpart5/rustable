@@ -569,6 +569,53 @@ mod tests {
         }
     }
 
+    // `Index::is_subset` should return `true` for two `Index` objects if all of
+    // the labels in the first `Index` are contained in the second.
+    proptest! {
+        #[test]
+        fn is_subset_tests_inclusion(
+            labels_a in LabelGen::unordered::<i32>(),
+            labels_b in LabelGen::unordered::<i32>(),
+        )
+        {
+            let expected = labels_a.is_subset(&labels_b);
+
+            let index_a = Index::from_iter(labels_a);
+            let index_b = Index::from_iter(labels_b);
+
+            let produced = Index::is_subset(&index_a, &index_b);
+
+            assert_eq!(produced, expected);
+        }
+    }
+
+    // Empty `Index` objects should be a subset of any other `Index` object,
+    // including themselves.
+    proptest! {
+        #[test]
+        fn empty_index_always_subset(index in IndexGen::index::<i32>()) {
+            let empty = Index::new();
+
+            assert!(Index::is_subset(&empty, &index));
+        }
+    }
+
+    // `Index::is_subset` should be anti-symmetric with respect to
+    // `Index::is_superset`.
+    proptest! {
+        #[test]
+        fn is_subset_is_anti_symmetric(
+            index_a in IndexGen::index::<i32>(),
+            index_b in IndexGen::index::<i32>(),
+        )
+        {
+            assert_eq!(
+                Index::is_subset(&index_a, &index_b),
+                Index::is_superset(&index_b, &index_a),
+            );
+        }
+    }
+
     #[test]
     fn iloc() {
         let i = Index::from_iter("ideographs".chars());
