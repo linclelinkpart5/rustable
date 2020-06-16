@@ -5,6 +5,7 @@ use std::fmt::Result as FmtResult;
 use std::error::Error;
 
 use crate::traits::Storable;
+use crate::traits::Label;
 
 #[derive(Debug)]
 pub struct ValueLenMismatch<V: Storable> {
@@ -19,6 +20,23 @@ impl<V: Storable> Display for ValueLenMismatch<V> {
 }
 
 impl<V: Storable> Error for ValueLenMismatch<V> {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        None
+    }
+}
+
+#[derive(Debug)]
+pub struct DuplicateIndexLabel<L: Label> {
+    pub label: L,
+}
+
+impl<L: Label> Display for DuplicateIndexLabel<L> {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        write!(f, "found duplicate index label: {:?}", self.label)
+    }
+}
+
+impl<L: Label> Error for DuplicateIndexLabel<L> {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         None
     }
