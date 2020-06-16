@@ -324,6 +324,14 @@ where
     pub fn is_strict_superset(&self, other: &Self) -> bool {
         other.is_strict_subset(self)
     }
+
+    /// Retains only the labels specified by the predicate.
+    pub fn retain<F>(&mut self, pred: F)
+    where
+        F: FnMut(&L) -> bool,
+    {
+        self.0.retain(pred)
+    }
 }
 
 impl<L> From<Index<L>> for Vec<L>

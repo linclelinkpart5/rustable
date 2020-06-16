@@ -4,6 +4,7 @@ pub mod error;
 
 use std::borrow::Borrow;
 use std::borrow::Cow;
+use std::collections::HashSet;
 use std::hash::Hash;
 
 use crate::traits::Storable;
@@ -29,6 +30,10 @@ where
     /// Creates a new, empty `Series` with no values and an empty `Index`.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    fn invariant(&self) {
+        assert_eq!(self.0.len(), self.1.len());
     }
 
     fn new_inner(index: Cow<'a, Index<K>>, values: Vec<V>) -> Self {
@@ -132,6 +137,32 @@ where
     // in order, with mutable references to the values.
     pub fn iter_mut(&'a mut self) -> IterMut<'a, K, V> {
         IterMut::new(self)
+    }
+
+    /// Retains only the label/value pairs specified by the predicate.
+    pub fn retain<F>(&'a mut self, mut pred: F)
+    where
+        F: FnMut(&K, &V) -> bool,
+    {
+        let mut pos_to_drop = HashSet::new();
+
+        for (pos, (label, value)) in self.iter().enumerate() {
+            if pred(label, value) {
+                pos_to_drop.insert(pos);
+            }
+        }
+
+        // Only do work if there are any pairs to drop.
+        if !pos_to_drop.is_empty() {
+            let mut p = 0usize;
+            self.0.to_mut().retain(|_| { (pos_to_drop.contains(&p), p +=1).0 });
+
+            let mut p = 0usize;
+            self.1.retain(|_| { (pos_to_drop.contains(&p), p +=1).0 });
+        }
+
+        // Assert that the index and value vector lengths are the same.
+        self.invariant();
     }
 }
 
