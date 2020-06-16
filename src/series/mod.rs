@@ -69,24 +69,34 @@ where
         Ok(Self::new_inner(Cow::Owned(index), values))
     }
 
-    /// Returns a read-only reference to the `Index` contained in this `Series`.
+    /// Returns a read-only reference to the `Index` of this `Series`.
     pub fn index(&self) -> &Index<K> {
         self.0.as_ref()
     }
 
-    /// Returns a read-only slice of the value data store of this `Series`.
+    /// Returns a read-only slice of the values in this `Series`.
     pub fn values(&self) -> &[V] {
         &self.1
     }
 
-    /// Returns a mutable slice of the value data store of this `Series`.
+    /// Returns a mutable slice of the values in this `Series`.
     pub fn values_mut(&mut self) -> &mut [V] {
         &mut self.1
     }
 
-    /// Consumes the `Series` and returns the value data store.
+    /// Consumes the `Series` and returns its `Index`.
+    pub fn into_index(self) -> Index<K> {
+        self.into_index_values().0
+    }
+
+    /// Consumes the `Series` and returns its values.
     pub fn into_values(self) -> Vec<V> {
-        self.1
+        self.into_index_values().1
+    }
+
+    /// Consumes the `Series` and returns its `Index` and its values.
+    pub fn into_index_values(self) -> (Index<K>, Vec<V>) {
+        (self.0.into_owned(), self.1)
     }
 
     /// Given a key, returns a read-only reference to its value in the `Series`,
