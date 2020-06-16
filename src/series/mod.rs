@@ -1,35 +1,35 @@
 
 use std::borrow::Borrow;
+use std::borrow::Cow;
 use std::hash::Hash;
 
 use crate::traits::Storable;
 use crate::traits::Label;
-use crate::types::DType;
 use crate::index::Index;
 
-#[derive(Debug, Default)]
-pub struct Series<K, V>
+#[derive(Debug)]
+pub struct Series<'a, K, V>
 where
     K: Label,
     V: Storable,
 {
-    index: Option<Index<K>>,
+    index: Cow<'a, Index<K>>,
     values: Vec<V>,
 }
 
-impl<K, V> Series<K, V>
+impl<'a, K, V> Series<'a, K, V>
 where
     K: Label,
     V: Storable,
 {
-    /// Returns the `DType` of this `Series`.
-    pub fn dtype(&self) -> DType {
-        V::dtype()
+    /// Creates a new, empty `Series` with no values and an empty `Index`.
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    /// Returns a readonly reference to the `Index` contained in this `Series`,
+    /// Returns a read-only reference to the `Index` contained in this `Series`,
     /// if there is one.
-    pub fn index(&self) -> Option<&Index<K>> {
+    pub fn index(&self) -> &Index<K> {
         self.index.as_ref()
     }
 
@@ -68,5 +68,18 @@ where
     {
         // Always return `None` if there is no index.
         todo!("Need to implement lookup on `Index` first");
+    }
+}
+
+impl<'a, K, V> Default for Series<'a, K, V>
+where
+    K: Label,
+    V: Storable,
+{
+    fn default() -> Self {
+        Self {
+            index: Cow::Owned(Index::default()),
+            values: Vec::default(),
+        }
     }
 }
