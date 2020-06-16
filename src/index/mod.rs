@@ -35,6 +35,10 @@ where
         Self::default()
     }
 
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self(IndexSet::with_capacity(capacity))
+    }
+
     pub fn dtype(&self) -> DType {
         L::dtype()
     }
