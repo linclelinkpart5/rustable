@@ -91,24 +91,22 @@ where
 
     /// Given a key, returns a read-only reference to its value in the `Series`,
     /// if it exists.
-    pub fn loc<Q>(&self, _loc: &Q) -> Option<&V>
+    pub fn loc<Q>(&self, label: &Q) -> Option<&V>
     where
         K: Borrow<Q>,
         Q: Hash + Eq,
     {
-        // Always return `None` if there is no index.
-        todo!("Need to implement lookup on `Index` first");
+        self.0.index_of(&label).and_then(move |pos| self.1.get(pos))
     }
 
     /// Given a key, returns a mutable reference to its value in the `Series`,
     /// if it exists.
-    pub fn loc_mut<Q>(&mut self, _loc: &Q) -> Option<&mut V>
+    pub fn loc_mut<Q>(&mut self, label: &Q) -> Option<&mut V>
     where
         K: Borrow<Q>,
         Q: Hash + Eq,
     {
-        // Always return `None` if there is no index.
-        todo!("Need to implement lookup on `Index` first");
+        self.0.index_of(&label).and_then(move |pos| self.1.get_mut(pos))
     }
 }
 
