@@ -12,14 +12,11 @@ use crate::index::Index;
 use self::error::DuplicateIndexLabel;
 
 #[derive(Debug)]
-pub struct Series<'a, K, V>
+pub struct Series<'a, K, V>(Cow<'a, Index<K>>, Vec<V>)
 where
     K: Label,
     V: Storable,
-{
-    index: Cow<'a, Index<K>>,
-    values: Vec<V>,
-}
+;
 
 impl<'a, K, V> Series<'a, K, V>
 where
@@ -31,52 +28,68 @@ where
         Self::default()
     }
 
+    fn new_inner(index: Cow<'a, Index<K>>, values: Vec<V>) -> Self {
+        assert_eq!(index.len(), values.len());
+
+        Self(index, values)
+    }
+
     /// Creates a new `Series` from an iterable of index label and value pairs.
-    /// If duplicated index labels are encountered, an `DuplicateIndexLabel`
+    /// If duplicated index labels are encountered, a `DuplicateIndexLabel`
     /// error is returned.
     pub fn from_pairs<I>(pairs: I) -> Result<Self, DuplicateIndexLabel<K>>
     where
         I: IntoIterator<Item = (K, V)>,
     {
-        let mut pairs = pairs.into_iter();
+        let pairs = pairs.into_iter();
 
         // Use `Iterator::size_hint` to try and pre-allocate.
-        let (_, opt_upper) = pairs.size_hint();
+        let (_, opt_upper_len) = pairs.size_hint();
 
-        let (mut index, mut values) = match opt_upper {
+        let (mut index, mut values) = match opt_upper_len {
             None => (Index::new(), Vec::new()),
-            Some(upper) => (Index::new(), Vec::with_capacity(upper)),
+            Some(upper_len) => (
+                Index::with_capacity(upper_len),
+                Vec::with_capacity(upper_len),
+            ),
         };
 
-        let index = Cow::Owned(index);
+        // Add in all of the pairs.
+        for (label, value) in pairs {
+            // Report an error if a duplicated label is found.
+            if index.contains(&label) {
+                // Need to use `return`, as using `?` moves the `label` var.
+                return Err(DuplicateIndexLabel { label });
+            }
 
-        let series = Self { index, values };
+            index.push(label);
+            values.push(value);
+        }
 
-        todo!();
+        Ok(Self::new_inner(Cow::Owned(index), values))
     }
 
-    /// Returns a read-only reference to the `Index` contained in this `Series`,
-    /// if there is one.
+    /// Returns a read-only reference to the `Index` contained in this `Series`.
     pub fn index(&self) -> &Index<K> {
-        self.index.as_ref()
+        self.0.as_ref()
     }
 
-    /// Consumes the `Series` and returns the value data store.
-    pub fn into_raw(self) -> Vec<V> {
-        self.values
-    }
-
-    /// Returns a readonly slice of the value data store of this `Series`.
-    pub fn as_slice(&self) -> &[V] {
-        &self.values
+    /// Returns a read-only slice of the value data store of this `Series`.
+    pub fn values(&self) -> &[V] {
+        &self.1
     }
 
     /// Returns a mutable slice of the value data store of this `Series`.
-    pub fn as_mut_slice(&mut self) -> &mut [V] {
-        &mut self.values
+    pub fn values_mut(&mut self) -> &mut [V] {
+        &mut self.1
     }
 
-    /// Given a key, returns a readonly reference to its value in the `Series`,
+    /// Consumes the `Series` and returns the value data store.
+    pub fn into_values(self) -> Vec<V> {
+        self.1
+    }
+
+    /// Given a key, returns a read-only reference to its value in the `Series`,
     /// if it exists.
     pub fn loc<Q>(&self, _loc: &Q) -> Option<&V>
     where
@@ -105,9 +118,6 @@ where
     V: Storable,
 {
     fn default() -> Self {
-        Self {
-            index: Cow::Owned(Index::default()),
-            values: Vec::default(),
-        }
+        Self(Cow::Owned(Index::default()), Vec::default())
     }
 }
