@@ -11,10 +11,11 @@ use crate::traits::Label;
 use crate::index::Index;
 
 use self::iter::Iter;
+use self::iter::IterMut;
 use self::error::DuplicateIndexLabel;
 
 #[derive(Debug)]
-pub struct Series<'a, K, V>(Cow<'a, Index<K>>, Vec<V>)
+pub struct Series<'a, K, V>(pub(crate) Cow<'a, Index<K>>, pub(crate) Vec<V>)
 where
     K: Label,
     V: Storable,
@@ -121,9 +122,16 @@ where
         self.0.index_of(&label).and_then(move |pos| self.1.get_mut(pos))
     }
 
-    // Returns an iterator over the label and value pairs in this `Series`.
-    pub fn iter(&self) -> Iter<'_, K, V> {
+    // Returns an iterator visiting all label and value pairs in this `Series`
+    // in order.
+    pub fn iter(&'a self) -> Iter<'a, K, V> {
         Iter::new(self)
+    }
+
+    // Returns an iterator visiting all label and value pairs in this `Series`
+    // in order, with mutable references to the values.
+    pub fn iter_mut(&'a mut self) -> IterMut<'a, K, V> {
+        IterMut::new(self)
     }
 }
 
