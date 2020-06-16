@@ -107,6 +107,21 @@ where
         (self.0.into_owned(), self.1)
     }
 
+    /// Clears all label and value pairs from this `Series`.
+    pub fn clear(&mut self) {
+        self.0.to_mut().clear();
+        self.1.clear();
+    }
+
+    /// Returns `true` if this `Series` contains the specified label.
+    pub fn contains_label<Q>(&self, label: &Q) -> bool
+    where
+        K: Borrow<Q>,
+        Q: Hash + Eq,
+    {
+        self.0.contains(label)
+    }
+
     /// Given a key, returns a read-only reference to its value in the `Series`,
     /// if it exists.
     pub fn loc<Q>(&self, label: &Q) -> Option<&V>
