@@ -1,4 +1,5 @@
 
+pub mod iter;
 pub mod error;
 
 use std::borrow::Borrow;
