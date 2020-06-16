@@ -9,6 +9,8 @@ use crate::traits::Storable;
 use crate::traits::Label;
 use crate::index::Index;
 
+use self::error::DuplicateIndexLabel;
+
 #[derive(Debug)]
 pub struct Series<'a, K, V>
 where
@@ -27,6 +29,30 @@ where
     /// Creates a new, empty `Series` with no values and an empty `Index`.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Creates a new `Series` from an iterable of index label and value pairs.
+    /// If duplicated index labels are encountered, an `DuplicateIndexLabel`
+    /// error is returned.
+    pub fn from_pairs<I>(pairs: I) -> Result<Self, DuplicateIndexLabel<K>>
+    where
+        I: IntoIterator<Item = (K, V)>,
+    {
+        let mut pairs = pairs.into_iter();
+
+        // Use `Iterator::size_hint` to try and pre-allocate.
+        let (_, opt_upper) = pairs.size_hint();
+
+        let (mut index, mut values) = match opt_upper {
+            None => (Index::new(), Vec::new()),
+            Some(upper) => (Index::new(), Vec::with_capacity(upper)),
+        };
+
+        let index = Cow::Owned(index);
+
+        let series = Self { index, values };
+
+        todo!();
     }
 
     /// Returns a read-only reference to the `Index` contained in this `Series`,
