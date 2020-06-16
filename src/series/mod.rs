@@ -10,6 +10,7 @@ use crate::traits::Storable;
 use crate::traits::Label;
 use crate::index::Index;
 
+use self::iter::Iter;
 use self::error::DuplicateIndexLabel;
 
 #[derive(Debug)]
@@ -118,6 +119,11 @@ where
         Q: Hash + Eq,
     {
         self.0.index_of(&label).and_then(move |pos| self.1.get_mut(pos))
+    }
+
+    // Returns an iterator over the label and value pairs in this `Series`.
+    pub fn iter(&self) -> Iter<'_, K, V> {
+        Iter::new(self)
     }
 }
 
