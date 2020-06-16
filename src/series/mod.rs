@@ -1,4 +1,6 @@
 
+pub mod error;
+
 use std::borrow::Borrow;
 use std::borrow::Cow;
 use std::hash::Hash;
