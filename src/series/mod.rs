@@ -1,6 +1,8 @@
 
 pub mod iter;
+pub mod dense;
 pub mod error;
+pub mod sparse;
 
 use std::borrow::Borrow;
 use std::borrow::Cow;
