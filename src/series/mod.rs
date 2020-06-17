@@ -2,6 +2,7 @@
 pub mod error;
 pub mod dense;
 pub mod sparse;
+pub mod values;
 
 use crate::traits::Storable;
 use crate::traits::Label;
