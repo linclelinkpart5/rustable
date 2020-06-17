@@ -42,7 +42,7 @@ where
         new
     }
 
-    /// Creates a new `Series` from an iterable of index label and value pairs.
+    /// Creates a new `Series` from an iterable of index label/value pairs.
     /// If duplicated index labels are encountered, a `DuplicateIndexLabel`
     /// error is returned.
     pub fn from_pairs<I>(pairs: I) -> Result<Self, DuplicateIndexLabel<K>>
@@ -77,6 +77,13 @@ where
         Ok(Self::new_inner(Cow::Owned(index), values))
     }
 
+    /// Returns the number of label/value pairs this `Series` can hold without
+    /// reallocating.
+    pub fn capacity(&self) -> usize {
+        // The effective capacity is the smaller of the two inner capacities.
+        Ord::min(self.0.capacity(), self.1.capacity())
+    }
+
     /// Returns a read-only reference to the `Index` of this `Series`.
     pub fn index(&self) -> &Index<K> {
         self.0.as_ref()
@@ -107,10 +114,16 @@ where
         (self.0.into_owned(), self.1)
     }
 
-    /// Clears all label and value pairs from this `Series`.
+    /// Clears all label/value pairs from this `Series`.
     pub fn clear(&mut self) {
         self.0.to_mut().clear();
         self.1.clear();
+    }
+
+    /// Returns `true` if this `Series` contains no label/value pairs.
+    pub fn is_empty(&self) -> bool {
+        self.invariant();
+        self.0.is_empty()
     }
 
     /// Returns `true` if this `Series` contains the specified label.
@@ -122,8 +135,8 @@ where
         self.0.contains(label)
     }
 
-    /// Given a key, returns a read-only reference to its value in the `Series`,
-    /// if it exists.
+    /// Given a label, returns a read-only reference to its value in the
+    /// `Series`, if it exists.
     pub fn loc<Q>(&self, label: &Q) -> Option<&V>
     where
         K: Borrow<Q>,
@@ -132,8 +145,8 @@ where
         self.0.index_of(&label).and_then(move |pos| self.1.get(pos))
     }
 
-    /// Given a key, returns a mutable reference to its value in the `Series`,
-    /// if it exists.
+    /// Given a label, returns a mutable reference to its value in the
+    /// `Series`, if it exists.
     pub fn loc_mut<Q>(&mut self, label: &Q) -> Option<&mut V>
     where
         K: Borrow<Q>,
@@ -142,13 +155,13 @@ where
         self.0.index_of(&label).and_then(move |pos| self.1.get_mut(pos))
     }
 
-    // Returns an iterator visiting all label and value pairs in this `Series`
+    // Returns an iterator visiting all label/value pairs in this `Series`
     // in order.
     pub fn iter(&'a self) -> Iter<'a, K, V> {
         Iter::new(self)
     }
 
-    // Returns an iterator visiting all label and value pairs in this `Series`
+    // Returns an iterator visiting all label/value pairs in this `Series`
     // in order, with mutable references to the values.
     pub fn iter_mut(&'a mut self) -> IterMut<'a, K, V> {
         IterMut::new(self)
