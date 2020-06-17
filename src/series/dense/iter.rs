@@ -3,33 +3,32 @@ use std::iter::Zip;
 use std::slice::Iter as SliceIter;
 use std::slice::IterMut as SliceIterMut;
 
+use super::SeriesDense;
+
 use crate::traits::Storable;
 use crate::traits::Label;
-use crate::series::Series;
 use crate::index::iter::Iter as IndexIter;
 
-pub struct Iter<'a, K, V>(Zip<IndexIter<'a, K>, SliceIter<'a, V>>)
-where
-    K: Label,
-    V: Storable,
-;
+pub struct Iter<'a, L: Label, V: Storable>(
+    Zip<IndexIter<'a, L>, SliceIter<'a, V>>,
+);
 
-impl<'a, K, V> Iter<'a, K, V>
+impl<'a, L, V> Iter<'a, L, V>
 where
-    K: Label,
+    L: Label,
     V: Storable,
 {
-    pub(crate) fn new(series: &'a Series<'a, K, V>) -> Self {
+    pub(crate) fn new(series: &'a SeriesDense<'a, L, V>) -> Self {
         Self(series.0.iter().zip(series.1.iter()))
     }
 }
 
-impl<'a, K, V> Iterator for Iter<'a, K, V>
+impl<'a, L, V> Iterator for Iter<'a, L, V>
 where
-    K: Label,
+    L: Label,
     V: Storable,
 {
-    type Item = (&'a K, &'a V);
+    type Item = (&'a L, &'a V);
 
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next()
@@ -40,9 +39,9 @@ where
     }
 }
 
-impl<'a, K, V> DoubleEndedIterator for Iter<'a, K, V>
+impl<'a, L, V> DoubleEndedIterator for Iter<'a, L, V>
 where
-    K: Label,
+    L: Label,
     V: Storable,
 {
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -50,9 +49,9 @@ where
     }
 }
 
-impl<'a, K, V> ExactSizeIterator for Iter<'a, K, V>
+impl<'a, L, V> ExactSizeIterator for Iter<'a, L, V>
 where
-    K: Label,
+    L: Label,
     V: Storable,
 {
     fn len(&self) -> usize {
@@ -60,28 +59,26 @@ where
     }
 }
 
-pub struct IterMut<'a, K, V>(Zip<IndexIter<'a, K>, SliceIterMut<'a, V>>)
-where
-    K: Label,
-    V: Storable,
-;
+pub struct IterMut<'a, L: Label, V: Storable>(
+    Zip<IndexIter<'a, L>, SliceIterMut<'a, V>>,
+);
 
-impl<'a, K, V> IterMut<'a, K, V>
+impl<'a, L, V> IterMut<'a, L, V>
 where
-    K: Label,
+    L: Label,
     V: Storable,
 {
-    pub(crate) fn new(series: &'a mut Series<'a, K, V>) -> Self {
-        Self(series.0.iter().zip(series.1.iter_mut()))
+    pub(crate) fn new(series: &'a mut SeriesDense<'a, L, V>) -> Self {
+        Self(series.0.iter().zip(series.1.to_mut().iter_mut()))
     }
 }
 
-impl<'a, K, V> Iterator for IterMut<'a, K, V>
+impl<'a, L, V> Iterator for IterMut<'a, L, V>
 where
-    K: Label,
+    L: Label,
     V: Storable,
 {
-    type Item = (&'a K, &'a mut V);
+    type Item = (&'a L, &'a mut V);
 
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next()
@@ -92,9 +89,9 @@ where
     }
 }
 
-impl<'a, K, V> DoubleEndedIterator for IterMut<'a, K, V>
+impl<'a, L, V> DoubleEndedIterator for IterMut<'a, L, V>
 where
-    K: Label,
+    L: Label,
     V: Storable,
 {
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -102,9 +99,9 @@ where
     }
 }
 
-impl<'a, K, V> ExactSizeIterator for IterMut<'a, K, V>
+impl<'a, L, V> ExactSizeIterator for IterMut<'a, L, V>
 where
-    K: Label,
+    L: Label,
     V: Storable,
 {
     fn len(&self) -> usize {
