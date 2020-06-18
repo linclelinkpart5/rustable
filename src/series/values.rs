@@ -1,5 +1,20 @@
 
+use crate::traits::RawType;
 use crate::traits::Storable;
+
+pub struct ValueStore<V: Storable>(Vec<V>);
+
+impl<V: Storable> ValueStore<V> {
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+impl<R: RawType + Storable> ValueStore<Option<R>> {
+    pub fn drop(self) -> ValueStore<R> {
+        ValueStore(self.0.into_iter().filter_map(|v| v).collect())
+    }
+}
 
 pub struct DenseValueStore<V: Storable>(Vec<V>);
 pub struct SparseValueStore<V: Storable>(Vec<Option<V>>);
