@@ -11,8 +11,34 @@ impl<V: Storable> ValueStore<V> {
 }
 
 impl<R: RawType + Storable> ValueStore<Option<R>> {
-    pub fn drop(self) -> ValueStore<R> {
-        ValueStore(self.0.into_iter().filter_map(|v| v).collect())
+    pub fn fill_none(self, value: R) -> ValueStore<R> {
+        ValueStore(
+            self.0
+            .into_iter()
+            .map(|v| v.unwrap_or(value.clone()))
+            .collect()
+        )
+    }
+
+    pub fn fill_none_with<F>(self, func: F) -> ValueStore<R>
+    where
+        F: Fn() -> R,
+    {
+        ValueStore(
+            self.0
+            .into_iter()
+            .map(|v| v.unwrap_or_else(|| func()))
+            .collect()
+        )
+    }
+
+    pub fn drop_none(self) -> ValueStore<R> {
+        ValueStore(
+            self.0
+            .into_iter()
+            .filter_map(|v| v)
+            .collect()
+        )
     }
 }
 
