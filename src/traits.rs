@@ -14,6 +14,6 @@ impl <R: RawType> Storable for R {}
 impl <R: RawType> Storable for Option<R> {}
 
 /// Trait that defines what is needed for a label in an `Index`.
-pub trait Label: Storable + PartialEq + Eq + Hash + PartialOrd + Ord {}
+pub trait Label: RawType + PartialEq + Eq + Hash + PartialOrd + Ord {}
 
-impl<T: Storable + PartialEq + Eq + Hash + PartialOrd + Ord> Label for T {}
+impl<T: RawType + PartialEq + Eq + Hash + PartialOrd + Ord> Label for T {}
