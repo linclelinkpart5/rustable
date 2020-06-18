@@ -3,6 +3,7 @@ use std::borrow::Cow;
 
 use crate::traits::Storable;
 
+#[derive(Debug, Clone)]
 struct ValueStoreImpl<'a, T: Clone>(Cow<'a, [T]>);
 
 impl<'a, T: Clone> ValueStoreImpl<'a, T> {
