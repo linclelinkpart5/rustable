@@ -9,20 +9,20 @@ pub use chrono::naive::{
     NaiveDateTime as DateTime,
 };
 
-use crate::traits::Storable;
+use crate::traits::RawType;
 
 /// Helper macro to create the plumbing for each type supported in `rustable`.
 macro_rules! define_types {
     ( $( ($type:ty, $name:ident $( , $cfg_flag:meta )?), )+ ) => {
         paste::item! {
-            /// Represents all data types supported by `rustable`.
-            #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-            pub enum DType {
-                $(
-                    $(#[$cfg_flag])? $name,
-                    $(#[$cfg_flag])? [<Opt $name>],
-                )*
-            }
+            // /// Represents all data types supported by `rustable`.
+            // #[derive(Debug, PartialEq, Eq, Copy, Clone)]
+            // pub enum DType {
+            //     $(
+            //         $(#[$cfg_flag])? $name,
+            //         // $(#[$cfg_flag])? [<Opt $name>],
+            //     )*
+            // }
 
             /// Provides references to elements within a potentially
             /// heterogeneous row of data.
@@ -30,7 +30,7 @@ macro_rules! define_types {
             pub enum Datum<'a> {
                 $(
                     $(#[$cfg_flag])? $name(&'a $type),
-                    $(#[$cfg_flag])? [<Opt $name>](&'a Option<$type>),
+                    // $(#[$cfg_flag])? [<Opt $name>](&'a Option<$type>),
                 )*
             }
 
@@ -43,18 +43,14 @@ macro_rules! define_types {
 
             $(
                 $(#[$cfg_flag])?
-                impl Storable for $type {
-                    fn dtype() -> DType {
-                        DType::$name
-                    }
-                }
+                impl RawType for $type {}
 
-                $(#[$cfg_flag])?
-                impl Storable for Option<$type> {
-                    fn dtype() -> DType {
-                        DType::[<Opt $name>]
-                    }
-                }
+                // $(#[$cfg_flag])?
+                // impl Storable for Option<$type> {
+                //     fn dtype() -> DType {
+                //         DType::[<Opt $name>]
+                //     }
+                // }
             )*
         }
     };

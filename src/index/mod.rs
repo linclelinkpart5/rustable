@@ -12,7 +12,6 @@ use indexmap::IndexSet;
 use is_sorted::IsSorted;
 
 use crate::traits::Label;
-use crate::types::DType;
 
 use self::iter::Iter;
 use self::iter::IntoIter;
@@ -37,10 +36,6 @@ where
 
     pub fn with_capacity(capacity: usize) -> Self {
         Self(IndexSet::with_capacity(capacity))
-    }
-
-    pub fn dtype(&self) -> DType {
-        L::dtype()
     }
 
     pub fn len(&self) -> usize {
