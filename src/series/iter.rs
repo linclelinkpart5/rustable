@@ -3,7 +3,7 @@ use std::iter::Zip;
 use std::slice::Iter as SliceIter;
 use std::slice::IterMut as SliceIterMut;
 
-use super::SeriesDense;
+use super::Series;
 
 use crate::traits::Storable;
 use crate::traits::Label;
@@ -18,7 +18,7 @@ where
     L: Label,
     V: Storable,
 {
-    pub(crate) fn new(series: &'a SeriesDense<'a, L, V>) -> Self {
+    pub(crate) fn new(series: &'a Series<'a, L, V>) -> Self {
         Self(series.0.iter().zip(series.1.iter()))
     }
 }
@@ -68,7 +68,7 @@ where
     L: Label,
     V: Storable,
 {
-    pub(crate) fn new(series: &'a mut SeriesDense<'a, L, V>) -> Self {
+    pub(crate) fn new(series: &'a mut Series<'a, L, V>) -> Self {
         Self(series.0.iter().zip(series.1.to_mut().iter_mut()))
     }
 }
