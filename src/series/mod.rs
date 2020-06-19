@@ -16,6 +16,7 @@ use crate::traits::RawType;
 pub use self::error::DuplicateIndexLabel;
 pub use self::iter::Iter;
 pub use self::iter::IterMut;
+pub use self::iter::IntoIter;
 
 #[derive(Debug)]
 pub struct Series<'a, L: Label, V: Storable>(
@@ -149,16 +150,22 @@ where
         self.0.index_of(&label).and_then(move |pos| self.1.to_mut().get_mut(pos))
     }
 
-    // Returns an iterator visiting all label/value pairs in this `Series`
+    // Returns an iterator that yields all label/value pairs in this `Series`
     // in order.
     pub fn iter(&'a self) -> Iter<'a, L, V> {
         Iter::new(self)
     }
 
-    // Returns an iterator visiting all label/value pairs in this `Series`
+    // Returns an iterator that yields all label/value pairs in this `Series`
     // in order, with mutable references to the values.
     pub fn iter_mut(&'a mut self) -> IterMut<'a, L, V> {
         IterMut::new(self)
+    }
+
+    // Returns an iterator that consumes this `Series` and yields all
+    // label/value pairs in order.
+    pub fn into_iter(self) -> IntoIter<L, V> {
+        IntoIter::new(self)
     }
 
     /// Retains only the label/value pairs specified by the predicate.
