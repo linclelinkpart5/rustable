@@ -180,10 +180,10 @@ where
         // Only do work if there are any pairs to drop.
         if !pos_to_drop.is_empty() {
             let mut p = 0usize;
-            self.0.to_mut().retain(|_| { (pos_to_drop.contains(&p), p += 1).0 });
+            self.0.to_mut().retain(|_| { (!pos_to_drop.contains(&p), p += 1).0 });
 
             let mut p = 0usize;
-            self.1.to_mut().retain(|_| { (pos_to_drop.contains(&p), p += 1).0 });
+            self.1.to_mut().retain(|_| { (!pos_to_drop.contains(&p), p += 1).0 });
         }
 
         // Assert that the index and value vector lengths are the same.
@@ -235,9 +235,9 @@ impl<'a, L: Label, R: RawType + Storable> Series<'a, L, Option<R>> {
 
     /// Consumes a `Series` containing `Option` values, fills `None`s with the
     /// result of the given function, and returns a new `Series` without `None`s.
-    pub fn fill_none_with<F>(self, func: F) -> Series<'a, L, R>
+    pub fn fill_none_with<F>(self, mut func: F) -> Series<'a, L, R>
     where
-        F: Fn() -> R,
+        F: FnMut() -> R,
     {
         self.fill_handler(|v| v.unwrap_or_else(|| func()))
     }
@@ -263,7 +263,7 @@ impl<'a, L: Label, R: RawType + Storable> Series<'a, L, Option<R>> {
         // Only mutate the `Index` if there are any elements to drop.
         if !pos_to_drop.is_empty() {
             let mut p = 0usize;
-            index.to_mut().retain(|_| { (pos_to_drop.contains(&p), p += 1).0 });
+            index.to_mut().retain(|_| { (!pos_to_drop.contains(&p), p += 1).0 });
         }
 
         Series::new_inner(index, Cow::Owned(raw_values))
@@ -292,5 +292,88 @@ where
     /// label/value pairs in order.
     fn into_iter(self) -> Self::IntoIter {
         IntoIter::new(self)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::iter::FromIterator;
+
+    #[test]
+    fn fill_none() {
+        let s = Series::from_pairs(vec![
+            (0, Some('a')),
+            (1, None),
+            (2, Some('b')),
+            (3, Some('c')),
+            (4, None),
+            (5, None),
+            (6, Some('d')),
+            (7, Some('e')),
+            (8, None),
+            (9, Some('f')),
+        ]).unwrap();
+
+        let filled_s = s.fill_none('x');
+
+        let (index, values) = filled_s.into_index_values();
+
+        assert_eq!(index, Index::from_iter(0..=9));
+        assert_eq!(values, vec!['a', 'x', 'b', 'c', 'x', 'x', 'd', 'e', 'x', 'f']);
+    }
+
+    #[test]
+    fn fill_none_with() {
+        let mut caps = false;
+        let fill_func = move || {
+            let ch = if caps { 'X' } else { 'x' };
+            caps = !caps;
+            ch
+        };
+
+        let s = Series::from_pairs(vec![
+            (0, Some('a')),
+            (1, None),
+            (2, Some('b')),
+            (3, Some('c')),
+            (4, None),
+            (5, None),
+            (6, Some('d')),
+            (7, Some('e')),
+            (8, None),
+            (9, Some('f')),
+        ]).unwrap();
+
+        let filled_s = s.fill_none_with(fill_func);
+
+        let (index, values) = filled_s.into_index_values();
+
+        assert_eq!(index, Index::from_iter(0..=9));
+        assert_eq!(values, vec!['a', 'x', 'b', 'c', 'X', 'x', 'd', 'e', 'X', 'f']);
+    }
+
+    #[test]
+    fn drop_none() {
+        let s = Series::from_pairs(vec![
+            (0, Some('a')),
+            (1, None),
+            (2, Some('b')),
+            (3, Some('c')),
+            (4, None),
+            (5, None),
+            (6, Some('d')),
+            (7, Some('e')),
+            (8, None),
+            (9, Some('f')),
+        ]).unwrap();
+
+        let dropped_s = s.drop_none();
+
+        let (index, values) = dropped_s.into_index_values();
+
+        assert_eq!(index, Index::from_iter(&[0, 2, 3, 6, 7, 9]));
+        assert_eq!(values, vec!['a', 'b', 'c', 'd', 'e', 'f']);
     }
 }
