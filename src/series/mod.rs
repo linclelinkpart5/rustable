@@ -207,6 +207,25 @@ where
     {
         self.retain(|_, v| pred(v));
     }
+
+    /// Applies a function to each value in this `Series`, and produces a new
+    /// `Series` with transformed values.
+    pub fn map<F, C>(self, map_func: F) -> Series<'a, L, C>
+    where
+        F: FnMut(V) -> C,
+        C: Storable,
+    {
+        let (index, values) = (self.0, self.1.into_owned());
+
+        let mapped_values =
+            values
+            .into_iter()
+            .map(map_func)
+            .collect()
+        ;
+
+        Series::new_inner(index, Cow::Owned(mapped_values))
+    }
 }
 
 impl<'a, L: Label, R: RawType + Storable> Series<'a, L, Option<R>> {
