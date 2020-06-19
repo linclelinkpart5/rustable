@@ -11,6 +11,7 @@ use std::hash::Hash;
 use crate::index::Index;
 use crate::traits::Storable;
 use crate::traits::Label;
+use crate::traits::RawType;
 
 pub use self::error::DuplicateIndexLabel;
 pub use self::iter::Iter;
@@ -204,6 +205,46 @@ where
         F: FnMut(&V) -> bool,
     {
         self.retain(|_, v| pred(v));
+    }
+}
+
+impl<'a, L: Label, R: RawType + Storable> Series<'a, L, Option<R>> {
+    fn fill_handler<F>(self, fill_func: F) -> Series<'a, L, R>
+    where
+        F: FnMut(Option<R>) -> R,
+    {
+        let (index, values) = (self.0, self.1.into_owned());
+
+        // NOTE: This should preserve the number and order of values!
+        let filled_values =
+            values
+            .into_iter()
+            .map(fill_func)
+            .collect()
+        ;
+
+        Series::new_inner(index, filled_values)
+    }
+
+    /// Consumes a `Series` containing `Option` values, fills `None`s with the
+    /// given value, and returns a new `Series` without `None`s.
+    pub fn fill_none(self, value: R) -> Series<'a, L, R> {
+        self.fill_handler(|v| v.unwrap_or_else(|| value.clone()))
+    }
+
+    /// Consumes a `Series` containing `Option` values, fills `None`s with the
+    /// result of the given function, and returns a new `Series` without `None`s.
+    pub fn fill_none_with<F>(self, func: F) -> Series<'a, L, R>
+    where
+        F: Fn() -> R,
+    {
+        self.fill_handler(|v| v.unwrap_or_else(|| func()))
+    }
+
+    /// Consumes a `Series` containing `Option` values, drops the label/value
+    /// pairs with a value of `None`, and returns a new `Series` without `None`s.
+    pub fn drop_none(self) -> Series<'a, L, R> {
+        todo!("Need to also drop the corresponding labels from the index")
     }
 }
 
