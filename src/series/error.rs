@@ -4,22 +4,25 @@ use std::fmt::Formatter;
 use std::fmt::Result as FmtResult;
 use std::error::Error;
 
+use crate::index::Index;
 use crate::traits::Storable;
 use crate::traits::Label;
 
 #[derive(Debug)]
-pub struct ValueLenMismatch<V: Storable> {
-    pub expected_len: usize,
+pub struct LengthMismatch<L: Label, V: Storable> {
+    pub index: Index<L>,
     pub values: Vec<V>,
 }
 
-impl<V: Storable> Display for ValueLenMismatch<V> {
+impl<L: Label, V: Storable> Display for LengthMismatch<L, V> {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
-        write!(f, "expected number of values {}, got {}", self.expected_len, self.values.len())
+        let i_len = self.index.len();
+        let v_len = self.values.len();
+        write!(f, "length mismatch between index and values: {} != {}", i_len, v_len)
     }
 }
 
-impl<V: Storable> Error for ValueLenMismatch<V> {
+impl<L: Label, V: Storable> Error for LengthMismatch<L, V> {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         None
     }

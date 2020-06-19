@@ -20,7 +20,7 @@ where
     L: Label,
     V: Storable,
 {
-    pub(crate) fn new(series: &'a Series<'a, L, V>) -> Self {
+    pub(crate) fn new(series: &'a Series<L, V>) -> Self {
         Self(series.0.iter().zip(series.1.iter()))
     }
 }
@@ -70,8 +70,8 @@ where
     L: Label,
     V: Storable,
 {
-    pub(crate) fn new(series: &'a mut Series<'a, L, V>) -> Self {
-        Self(series.0.iter().zip(series.1.to_mut().iter_mut()))
+    pub(crate) fn new(series: &'a mut Series<L, V>) -> Self {
+        Self(series.0.iter().zip(series.1.iter_mut()))
     }
 }
 
@@ -120,7 +120,7 @@ where
     L: Label,
     V: Storable,
 {
-    pub(crate) fn new(series: Series<'_, L, V>) -> Self {
+    pub(crate) fn new(series: Series<L, V>) -> Self {
         let (index, values) = series.into_index_values();
         let index_ii = index.into_iter();
         let values_ii = values.into_iter();

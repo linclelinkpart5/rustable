@@ -4,7 +4,6 @@ pub mod iter;
 pub mod values;
 
 use std::borrow::Borrow;
-use std::borrow::Cow;
 use std::collections::HashSet;
 use std::hash::Hash;
 
@@ -14,17 +13,18 @@ use crate::traits::Label;
 use crate::traits::RawType;
 
 pub use self::error::DuplicateIndexLabel;
+pub use self::error::LengthMismatch;
 pub use self::iter::Iter;
 pub use self::iter::IterMut;
 pub use self::iter::IntoIter;
 
 #[derive(Debug)]
-pub struct Series<'a, L: Label, V: Storable>(
-    pub(crate) Cow<'a, Index<L>>,
-    pub(crate) Cow<'a, [V]>,
+pub struct Series<L: Label, V: Storable>(
+    pub(crate) Index<L>,
+    pub(crate) Vec<V>,
 );
 
-impl<'a, L, V> Series<'a, L, V>
+impl<L, V> Series<L, V>
 where
     L: Label,
     V: Storable,
@@ -34,13 +34,13 @@ where
         Self::default()
     }
 
-    fn invariant(&self) {
+    fn assert_len(&self) {
         assert_eq!(self.0.len(), self.1.len());
     }
 
-    fn new_inner(index: Cow<'a, Index<L>>, values: Cow<'a, [V]>) -> Self {
+    fn new_inner(index: Index<L>, values: Vec<V>) -> Self {
         let new = Self(index, values);
-        new.invariant();
+        new.assert_len();
         new
     }
 
@@ -76,12 +76,21 @@ where
             values.push(value);
         }
 
-        Ok(Self::new_inner(Cow::Owned(index), Cow::Owned(values)))
+        Ok(Self::new_inner(index, values))
+    }
+
+    pub fn from_values(index: Index<L>, values: Vec<V>) -> Result<Self, LengthMismatch<L, V>> {
+        // Check if the lengths of the index and values are the same.
+        if index.len() != values.len() {
+            return Err(LengthMismatch { index, values });
+        } else {
+            Ok(Self::new_inner(index, values))
+        }
     }
 
     /// Returns a read-only reference to the `Index` of this `Series`.
     pub fn index(&self) -> &Index<L> {
-        self.0.as_ref()
+        &self.0
     }
 
     /// Returns a read-only slice of the values in this `Series`.
@@ -91,7 +100,7 @@ where
 
     /// Returns a mutable slice of the values in this `Series`.
     pub fn values_mut(&mut self) -> &mut [V] {
-        self.1.to_mut()
+        &mut self.1
     }
 
     /// Consumes the `Series` and returns its `Index`.
@@ -106,18 +115,18 @@ where
 
     /// Consumes the `Series` and returns its `Index` and its values.
     pub fn into_index_values(self) -> (Index<L>, Vec<V>) {
-        (self.0.into_owned(), self.1.into_owned())
+        (self.0, self.1)
     }
 
     /// Clears all label/value pairs from this `Series`.
     pub fn clear(&mut self) {
-        self.0.to_mut().clear();
-        self.1.to_mut().clear();
+        self.0.clear();
+        self.1.clear();
     }
 
     /// Returns `true` if this `Series` contains no label/value pairs.
     pub fn is_empty(&self) -> bool {
-        self.invariant();
+        self.assert_len();
         self.0.is_empty()
     }
 
@@ -147,18 +156,18 @@ where
         L: Borrow<Q>,
         Q: Hash + Eq,
     {
-        self.0.index_of(&label).and_then(move |pos| self.1.to_mut().get_mut(pos))
+        self.0.index_of(&label).and_then(move |pos| self.1.get_mut(pos))
     }
 
     /// Returns an iterator that yields all label/value pairs in this `Series`
     /// in order.
-    pub fn iter(&'a self) -> Iter<'a, L, V> {
+    pub fn iter(&self) -> Iter<L, V> {
         Iter::new(self)
     }
 
     /// Returns an iterator that yields all label/value pairs in this `Series`
     /// in order, with mutable references to the values.
-    pub fn iter_mut(&'a mut self) -> IterMut<'a, L, V> {
+    pub fn iter_mut(&mut self) -> IterMut<L, V> {
         IterMut::new(self)
     }
 
@@ -180,14 +189,14 @@ where
         // Only do work if there are any pairs to drop.
         if !pos_to_drop.is_empty() {
             let mut p = 0usize;
-            self.0.to_mut().retain(|_| { (!pos_to_drop.contains(&p), p += 1).0 });
+            self.0.retain(|_| { (!pos_to_drop.contains(&p), p += 1).0 });
 
             let mut p = 0usize;
-            self.1.to_mut().retain(|_| { (!pos_to_drop.contains(&p), p += 1).0 });
+            self.1.retain(|_| { (!pos_to_drop.contains(&p), p += 1).0 });
         }
 
-        // Assert that the index and value vector lengths are the same.
-        self.invariant();
+        // Assert that the index and value lengths are the same.
+        self.assert_len();
     }
 
     /// Retains only the label/value pairs specified by the predicate.
@@ -210,12 +219,12 @@ where
 
     /// Applies a function to each value in this `Series`, and produces a new
     /// `Series` with transformed values.
-    pub fn map<F, C>(self, map_func: F) -> Series<'a, L, C>
+    pub fn map<F, C>(self, map_func: F) -> Series<L, C>
     where
         F: FnMut(V) -> C,
         C: Storable,
     {
-        let (index, values) = (self.0, self.1.into_owned());
+        let (index, values) = (self.0, self.1);
 
         let mapped_values =
             values
@@ -224,16 +233,16 @@ where
             .collect()
         ;
 
-        Series::new_inner(index, Cow::Owned(mapped_values))
+        Series::new_inner(index, mapped_values)
     }
 }
 
-impl<'a, L: Label, R: RawType + Storable> Series<'a, L, Option<R>> {
-    fn fill_handler<F>(self, fill_func: F) -> Series<'a, L, R>
+impl<L: Label, R: RawType + Storable> Series<L, Option<R>> {
+    fn fill_handler<F>(self, fill_func: F) -> Series<L, R>
     where
         F: FnMut(Option<R>) -> R,
     {
-        let (index, values) = (self.0, self.1.into_owned());
+        let (index, values) = (self.0, self.1);
 
         // NOTE: This should preserve the number and order of values!
         let filled_values =
@@ -248,13 +257,13 @@ impl<'a, L: Label, R: RawType + Storable> Series<'a, L, Option<R>> {
 
     /// Consumes a `Series` containing `Option` values, fills `None`s with the
     /// given value, and returns a new `Series` without `None`s.
-    pub fn fill_none(self, value: R) -> Series<'a, L, R> {
+    pub fn fill_none(self, value: R) -> Series<L, R> {
         self.fill_handler(|v| v.unwrap_or_else(|| value.clone()))
     }
 
     /// Consumes a `Series` containing `Option` values, fills `None`s with the
     /// result of the given function, and returns a new `Series` without `None`s.
-    pub fn fill_none_with<F>(self, mut func: F) -> Series<'a, L, R>
+    pub fn fill_none_with<F>(self, mut func: F) -> Series<L, R>
     where
         F: FnMut() -> R,
     {
@@ -263,11 +272,11 @@ impl<'a, L: Label, R: RawType + Storable> Series<'a, L, Option<R>> {
 
     /// Consumes a `Series` containing `Option` values, drops the label/value
     /// pairs with a value of `None`, and returns a new `Series` without `None`s.
-    pub fn drop_none(self) -> Series<'a, L, R> {
+    pub fn drop_none(self) -> Series<L, R> {
         // NOTE: The `Index` may not need to be modified if no values end up
         //       getting dropped. The values will always need to be modified.
         let mut index = self.0;
-        let values = self.1.into_owned();
+        let values = self.1;
 
         let mut pos_to_drop = HashSet::new();
         let mut raw_values = Vec::<R>::with_capacity(values.len());
@@ -282,24 +291,24 @@ impl<'a, L: Label, R: RawType + Storable> Series<'a, L, Option<R>> {
         // Only mutate the `Index` if there are any elements to drop.
         if !pos_to_drop.is_empty() {
             let mut p = 0usize;
-            index.to_mut().retain(|_| { (!pos_to_drop.contains(&p), p += 1).0 });
+            index.retain(|_| { (!pos_to_drop.contains(&p), p += 1).0 });
         }
 
-        Series::new_inner(index, Cow::Owned(raw_values))
+        Series::new_inner(index, raw_values)
     }
 }
 
-impl<'a, L, V> Default for Series<'a, L, V>
+impl<L, V> Default for Series<L, V>
 where
     L: Label,
     V: Storable,
 {
     fn default() -> Self {
-        Self(Cow::Owned(Index::default()), Cow::Owned(Vec::default()))
+        Self(Index::default(), Vec::default())
     }
 }
 
-impl<'a, L, V> IntoIterator for Series<'a, L, V>
+impl<L, V> IntoIterator for Series<L, V>
 where
     L: Label,
     V: Storable,
