@@ -2,12 +2,14 @@
 use std::iter::Zip;
 use std::slice::Iter as SliceIter;
 use std::slice::IterMut as SliceIterMut;
+use std::vec::IntoIter as VecIntoIter;
 
 use super::Series;
 
 use crate::traits::Storable;
 use crate::traits::Label;
 use crate::index::iter::Iter as IndexIter;
+use crate::index::iter::IntoIter as IndexIntoIter;
 
 pub struct Iter<'a, L: Label, V: Storable>(
     Zip<IndexIter<'a, L>, SliceIter<'a, V>>,
@@ -100,6 +102,60 @@ where
 }
 
 impl<'a, L, V> ExactSizeIterator for IterMut<'a, L, V>
+where
+    L: Label,
+    V: Storable,
+{
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+pub struct IntoIter<L: Label, V: Storable>(
+    Zip<IndexIntoIter<L>, VecIntoIter<V>>,
+);
+
+impl<L, V> IntoIter<L, V>
+where
+    L: Label,
+    V: Storable,
+{
+    pub(crate) fn new(series: Series<'_, L, V>) -> Self {
+        let (index, values) = series.into_index_values();
+        let index_ii = index.into_iter();
+        let values_ii = values.into_iter();
+
+        Self(index_ii.zip(values_ii))
+    }
+}
+
+impl<L, V> Iterator for IntoIter<L, V>
+where
+    L: Label,
+    V: Storable,
+{
+    type Item = (L, V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
+    }
+}
+
+impl<L, V> DoubleEndedIterator for IntoIter<L, V>
+where
+    L: Label,
+    V: Storable,
+{
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.0.next_back()
+    }
+}
+
+impl<L, V> ExactSizeIterator for IntoIter<L, V>
 where
     L: Label,
     V: Storable,
