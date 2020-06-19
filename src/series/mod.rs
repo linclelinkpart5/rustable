@@ -245,7 +245,28 @@ impl<'a, L: Label, R: RawType + Storable> Series<'a, L, Option<R>> {
     /// Consumes a `Series` containing `Option` values, drops the label/value
     /// pairs with a value of `None`, and returns a new `Series` without `None`s.
     pub fn drop_none(self) -> Series<'a, L, R> {
-        todo!("Need to also drop the corresponding labels from the index")
+        // NOTE: The `Index` may not need to be modified if no values end up
+        //       getting dropped. The values will always need to be modified.
+        let mut index = self.0;
+        let values = self.1.into_owned();
+
+        let mut pos_to_drop = HashSet::new();
+        let mut raw_values = Vec::<R>::with_capacity(values.len());
+
+        for (pos, value) in values.into_iter().enumerate() {
+            match value {
+                Some(rv) => { raw_values.push(rv); },
+                None => { pos_to_drop.insert(pos); }
+            }
+        }
+
+        // Only mutate the `Index` if there are any elements to drop.
+        if !pos_to_drop.is_empty() {
+            let mut p = 0usize;
+            index.to_mut().retain(|_| { (pos_to_drop.contains(&p), p += 1).0 });
+        }
+
+        Series::new_inner(index, Cow::Owned(raw_values))
     }
 }
 
