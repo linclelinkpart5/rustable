@@ -6,6 +6,9 @@ pub mod values;
 use std::borrow::Borrow;
 use std::collections::HashSet;
 use std::hash::Hash;
+use std::iter::FromIterator;
+
+use indexmap::IndexMap;
 
 use crate::index::Index;
 use crate::traits::Storable;
@@ -14,6 +17,7 @@ use crate::traits::RawType;
 
 pub use self::error::DuplicateIndexLabel;
 pub use self::error::LengthMismatch;
+pub use self::error::OverlappingIndex;
 pub use self::iter::Iter;
 pub use self::iter::IterMut;
 pub use self::iter::IntoIter;
@@ -47,11 +51,11 @@ where
     /// Creates a new `Series` from an iterable of index label/value pairs.
     /// If duplicated index labels are encountered, a `DuplicateIndexLabel`
     /// error is returned.
-    pub fn from_pairs<I>(pairs: I) -> Result<Self, DuplicateIndexLabel<L>>
+    pub fn from_iter_checked<I>(iter: I) -> Result<Self, DuplicateIndexLabel<L>>
     where
         I: IntoIterator<Item = (L, V)>,
     {
-        let pairs = pairs.into_iter();
+        let pairs = iter.into_iter();
 
         // Use `Iterator::size_hint` to try and pre-allocate.
         let (_, opt_upper_len) = pairs.size_hint();
@@ -137,6 +141,18 @@ where
         Q: Hash + Eq,
     {
         self.0.contains(label)
+    }
+
+    /// Given a position, returns a read-only reference to its value in the
+    /// `Series`, if it exists.
+    pub fn iloc(&self, pos: usize) -> Option<&V> {
+        self.1.get(pos)
+    }
+
+    /// Given a position, returns a mutable reference to its value in the
+    /// `Series`, if it exists.
+    pub fn iloc_mut(&mut self, pos: usize) -> Option<&mut V> {
+        self.1.get_mut(pos)
     }
 
     /// Given a label, returns a read-only reference to its value in the
@@ -235,6 +251,10 @@ where
 
         Series::new_inner(index, mapped_values)
     }
+
+    pub fn concat_checked(self, other: Self) -> Result<Self, OverlappingIndex> {
+        Ok(self)
+    }
 }
 
 impl<L: Label, R: RawType + Storable> Series<L, Option<R>> {
@@ -323,6 +343,29 @@ where
     }
 }
 
+impl<L, V> FromIterator<(L, V)> for Series<L, V>
+where
+    L: Label,
+    V: Storable,
+{
+    fn from_iter<I>(iter: I) -> Self
+    where
+        I: IntoIterator<Item = (L, V)>,
+    {
+        let index_map: IndexMap<L, V> = IndexMap::from_iter(iter);
+
+        let mut index = Index::with_capacity(index_map.len());
+        let mut values = Vec::with_capacity(index_map.len());
+
+        for (l, v) in index_map {
+            index.push(l);
+            values.push(v);
+        }
+
+        Self::new_inner(index, values)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -331,7 +374,7 @@ mod tests {
 
     #[test]
     fn fill_none() {
-        let s = Series::from_pairs(vec![
+        let s = Series::from_iter_checked(vec![
             (0, Some('a')),
             (1, None),
             (2, Some('b')),
@@ -361,7 +404,7 @@ mod tests {
             ch
         };
 
-        let s = Series::from_pairs(vec![
+        let s = Series::from_iter_checked(vec![
             (0, Some('a')),
             (1, None),
             (2, Some('b')),
@@ -384,7 +427,7 @@ mod tests {
 
     #[test]
     fn drop_none() {
-        let s = Series::from_pairs(vec![
+        let s = Series::from_iter_checked(vec![
             (0, Some('a')),
             (1, None),
             (2, Some('b')),

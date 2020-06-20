@@ -44,3 +44,18 @@ impl<L: Label> Error for DuplicateIndexLabel<L> {
         None
     }
 }
+
+#[derive(Debug)]
+pub struct OverlappingIndex;
+
+impl Display for OverlappingIndex {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        write!(f, "overlapping index")
+    }
+}
+
+impl Error for OverlappingIndex {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        None
+    }
+}
